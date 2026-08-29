@@ -1,0 +1,2 @@
+# dizzybot
+Discord bot
