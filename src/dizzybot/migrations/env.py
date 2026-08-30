@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import Connection, pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from alembic import context
 from dizzybot.defaults.radio_repository import RadioStationRow as _RadioStationRow
 from dizzybot.defaults.settings import Base
 

@@ -4,13 +4,13 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
+from alembic import command
 from alembic.config import Config as AlembicConfig
 from sqlalchemy import BigInteger, String, delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Mapped, mapped_column
 
-from alembic import command
 from dizzybot.contracts import BaseRadioRepository
 from dizzybot.defaults.settings import Base
 from dizzybot.domain import RadioStation

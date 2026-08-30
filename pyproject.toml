@@ -56,6 +56,9 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "ASYNC", "RUF"]
 
+[tool.ruff.lint.isort]
+known-third-party = ["alembic"]
+
 [tool.pyright]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"

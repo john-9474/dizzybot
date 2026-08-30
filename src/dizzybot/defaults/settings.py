@@ -4,12 +4,12 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
+from alembic import command
 from alembic.config import Config as AlembicConfig
 from sqlalchemy import BigInteger, Boolean, Integer, String, delete
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from alembic import command
 from dizzybot.contracts import BaseSettingsRepository
 from dizzybot.domain import GuildSettings, Source
 
