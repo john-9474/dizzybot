@@ -1,0 +1,98 @@
+server:
+  port: 2333
+  address: "${LAVALINK_SERVER_ADDRESS:0.0.0.0}"
+
+lavalink:
+  plugins:
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.8.3"
+      snapshot: false
+  server:
+    password: "${LAVALINK_PASSWORD}"
+    sources:
+      youtube: false
+      bandcamp: false
+      soundcloud: true
+      twitch: false
+      vimeo: false
+      nico: false
+      http: true
+      local: false
+    filters:
+      volume: true
+      equalizer: true
+      karaoke: false
+      timescale: true
+      tremolo: false
+      vibrato: false
+      distortion: false
+      rotation: false
+      channelMix: false
+      lowPass: false
+    bufferDurationMs: 400
+    frameBufferDurationMs: 5000
+    opusEncodingQuality: 10
+    resamplingQuality: MEDIUM
+    trackStuckThresholdMs: 10000
+    useSeekGhosting: true
+    playerUpdateInterval: 5
+    soundcloudSearchEnabled: true
+    soundcloudFilterOutPreviewTracks: true
+    gc-warnings: true
+    timeouts:
+      connectTimeoutMs: 5000
+      connectionRequestTimeoutMs: 5000
+      socketTimeoutMs: 5000
+
+plugins:
+  lavasrc:
+    providers:
+      - "ytsearch:\"%ISRC%\""
+      - "ytsearch:%QUERY%"
+      - "scsearch:%QUERY%"
+    sources:
+      spotify: ${LAVASRC_SPOTIFY_CONFIGURED:false}
+      applemusic: false
+      deezer: false
+      yandexmusic: false
+      flowerytts: false
+      youtube: false
+      vkmusic: false
+      tidal: false
+      qobuz: false
+      ytdlp: true
+      jiosaavn: false
+    lyrics-sources:
+      spotify: false
+      deezer: false
+      youtube: false
+      yandexmusic: false
+      vkmusic: false
+      lrcLib: false
+    spotify:
+      clientId: "${SPOTIFY_CLIENT_ID:}"
+      clientSecret: "${SPOTIFY_CLIENT_SECRET:}"
+      countryCode: "${SPOTIFY_COUNTRY_CODE:GB}"
+      playlistLoadLimit: 5
+      albumLoadLimit: 10
+      resolveArtistsInSearch: false
+      localFiles: false
+      preferPartnerApi: false
+      preferV1SearchApi: false
+    ytdlp:
+      path: "/usr/local/bin/yt-dlp"
+      searchLimit: 10
+      mixPlaylistLoadLimit: 25
+      playlistLoadLimit: 100
+
+metrics:
+  prometheus:
+    enabled: false
+
+logging:
+  level:
+    root: INFO
+    lavalink: INFO
+    io.undertow.websockets.jsr: ERROR
+    lavalink.server.config.SentryConfiguration: ERROR
+  request:
+    enabled: false

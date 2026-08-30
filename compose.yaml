@@ -1,0 +1,42 @@
+name: dizzybot
+
+services:
+  lavalink:
+    image: ghcr.io/john-9474/dizzybot-lavalink:${DIZZYBOT_VERSION:-latest}
+    build:
+      context: deploy/lavalink
+    restart: unless-stopped
+    environment:
+      LAVALINK_PASSWORD: ${LAVALINK_PASSWORD:?Set LAVALINK_PASSWORD in .env}
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+      SPOTIFY_COUNTRY_CODE: ${SPOTIFY_COUNTRY_CODE:-GB}
+      _JAVA_OPTIONS: ${LAVALINK_JAVA_OPTIONS:--Xms128m -Xmx1g}
+    networks:
+      - audio
+
+  bot:
+    image: ghcr.io/john-9474/dizzybot:${DIZZYBOT_VERSION:-latest}
+    build:
+      context: .
+    restart: unless-stopped
+    depends_on:
+      lavalink:
+        condition: service_healthy
+    environment:
+      DISCORD_TOKEN: ${DISCORD_TOKEN:?Set DISCORD_TOKEN in .env}
+      LAVALINK_PASSWORD: ${LAVALINK_PASSWORD:?Set LAVALINK_PASSWORD in .env}
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+      DIZZYBOT__LOGGING__LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - bot_data:/data
+    networks:
+      - audio
+
+volumes:
+  bot_data:
+
+networks:
+  audio:
+    driver: bridge

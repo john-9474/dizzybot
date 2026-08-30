@@ -1,0 +1,1 @@
+"""DizzyBot database revisions."""

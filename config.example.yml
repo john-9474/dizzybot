@@ -1,0 +1,26 @@
+bot:
+  default_volume: 75
+  idle_timeout_seconds: 300
+  stay_connected: false
+  default_search_source: youtube
+  playlist_track_limit: 100
+  queue_track_limit: 500
+  radio_station_limit: 50
+  allow_private_radio_streams: false
+  command_sync_guild_id: null
+
+lavalink:
+  uri: http://lavalink:2333
+  identifier: dizzybot
+  connect_retries: 10
+  retry_delay_seconds: 3
+
+database:
+  url: sqlite+aiosqlite:////data/dizzybot.sqlite3
+
+health:
+  host: 0.0.0.0
+  port: 8080
+
+logging:
+  level: INFO
