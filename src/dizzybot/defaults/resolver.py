@@ -15,11 +15,23 @@ class DefaultTrackResolver(BaseTrackResolver):
         (Source.YOUTUBE, ("youtube.com", "youtu.be")),
         (Source.SOUNDCLOUD, ("soundcloud.com",)),
         (Source.SPOTIFY, ("spotify.com", "spotify.link")),
+        (Source.APPLE_MUSIC, ("music.apple.com",)),
+        (Source.TIDAL, ("tidal.com",)),
+        (Source.BANDCAMP, ("bandcamp.com",)),
     )
     _SEARCH_PREFIXES: ClassVar[dict[Source, str]] = {
         Source.YOUTUBE: "ytsearch:",
         Source.SOUNDCLOUD: "scsearch:",
         Source.SPOTIFY: "spsearch:",
+        Source.APPLE_MUSIC: "amsearch:",
+        Source.TIDAL: "tdsearch:",
+        Source.BANDCAMP: "bcsearch:",
+    }
+    _UNAVAILABLE_MESSAGES: ClassVar[dict[Source, str]] = {
+        Source.SPOTIFY: (
+            "Spotify is unavailable. Provide both SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET."
+        ),
+        Source.TIDAL: "TIDAL is unavailable. Provide TIDAL_TOKEN.",
     }
 
     def __init__(self, backend: BaseAudioBackend, *, available_sources: Collection[Source]) -> None:
@@ -46,7 +58,10 @@ class DefaultTrackResolver(BaseTrackResolver):
         detected = self.detect_source(query)
         is_url = urlparse(query).scheme in {"http", "https"}
         if is_url and detected is None:
-            raise InvalidRequestError("Only YouTube, SoundCloud, and Spotify URLs are supported.")
+            raise InvalidRequestError(
+                "Only YouTube, SoundCloud, Spotify, Apple Music, TIDAL, and Bandcamp "
+                "URLs are supported."
+            )
 
         requested_source = (
             request.default_source if request.source is Source.AUTO else request.source
@@ -62,7 +77,9 @@ class DefaultTrackResolver(BaseTrackResolver):
             raise InvalidRequestError("Use `/radio play` to play a saved radio station.")
         if source not in self._available_sources:
             raise SourceUnavailableError(
-                "Spotify is unavailable. Provide both SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET."
+                self._UNAVAILABLE_MESSAGES.get(
+                    source, f"{source.value.replace('_', ' ').title()} is unavailable."
+                )
             )
 
         identifier = query if detected is not None else f"{self._SEARCH_PREFIXES[source]}{query}"

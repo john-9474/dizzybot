@@ -3,8 +3,8 @@
 Please report suspected vulnerabilities privately through GitHub's security advisory feature rather
 than a public issue. Include affected versions, reproduction details, and likely impact.
 
-Never include Discord tokens, Lavalink passwords, Spotify credentials, cookies, or exported account
-data in an issue or log excerpt. Rotate any credential that may have been exposed.
+Never include Discord tokens, Lavalink passwords, provider API tokens, credentials, cookies, or
+exported account data in an issue or log excerpt. Rotate any credential that may have been exposed.
 
 The project supports the latest tagged release. Self-hosters should keep DizzyBot, Lavalink, its
 plugins, and the base container images current and should not publish the Lavalink port to untrusted

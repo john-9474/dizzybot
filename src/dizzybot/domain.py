@@ -12,6 +12,9 @@ class Source(StrEnum):
     YOUTUBE = "youtube"
     SOUNDCLOUD = "soundcloud"
     SPOTIFY = "spotify"
+    APPLE_MUSIC = "apple_music"
+    TIDAL = "tidal"
+    BANDCAMP = "bandcamp"
     RADIO = "radio"
 
 

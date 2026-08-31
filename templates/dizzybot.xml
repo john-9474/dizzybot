@@ -7,15 +7,15 @@
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
   <Icon>https://raw.githubusercontent.com/john-9474/dizzybot/main/assets/dizzybot.svg</Icon>
-  <Overview>DizzyBot is an extensible, self-hosted Discord music bot with YouTube, SoundCloud, internet radio, and optional Spotify support. This single container includes its private Lavalink audio node; no Compose stack, second container, exposed port, or manually managed Lavalink password is required.</Overview>
+  <Overview>DizzyBot is an extensible, self-hosted Discord music bot with YouTube, SoundCloud, Bandcamp, Apple Music metadata mirroring, internet radio, and optional Spotify and TIDAL metadata mirroring. This single container includes its private Lavalink audio node; no Compose stack, second container, exposed port, or manually managed Lavalink password is required.</Overview>
   <Support>https://github.com/john-9474/dizzybot/issues</Support>
   <Project>https://github.com/john-9474/dizzybot</Project>
   <TemplateURL>https://raw.githubusercontent.com/john-9474/dizzybot/main/templates/dizzybot.xml</TemplateURL>
   <ReadMe>https://raw.githubusercontent.com/john-9474/dizzybot/main/README.md</ReadMe>
   <Category>MediaApp:Music</Category>
-  <ExtraSearchTerms>discord bot lavalink youtube soundcloud spotify internet radio icecast shoutcast</ExtraSearchTerms>
+  <ExtraSearchTerms>discord bot lavalink youtube soundcloud spotify apple music tidal bandcamp internet radio icecast shoutcast</ExtraSearchTerms>
   <Requires>A Discord bot token and outbound internet access. Allow approximately 1 GB of RAM for the bundled Lavalink process.</Requires>
-  <Changes>Initial single-container Unraid release.</Changes>
+  <Changes>Adds Apple Music, TIDAL, and Bandcamp sources.</Changes>
   <License>GPL-3.0-only</License>
   <ExtraParams>--restart=unless-stopped</ExtraParams>
   <Config Name="Appdata" Target="/data" Default="/mnt/user/appdata/dizzybot" Mode="rw" Description="Persistent DizzyBot database and server settings." Type="Path" Display="always" Required="true" Mask="false"/>
@@ -23,6 +23,9 @@
   <Config Name="Spotify Client ID" Target="SPOTIFY_CLIENT_ID" Default="" Description="Optional. Spotify activates automatically when both Spotify credentials are provided." Type="Variable" Display="always" Required="false" Mask="false"/>
   <Config Name="Spotify Client Secret" Target="SPOTIFY_CLIENT_SECRET" Default="" Description="Optional. Spotify activates automatically when both Spotify credentials are provided." Type="Variable" Display="always" Required="false" Mask="true"/>
   <Config Name="Spotify Country Code" Target="SPOTIFY_COUNTRY_CODE" Default="GB" Description="Two-letter country code used for Spotify metadata." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Apple Music Country Code" Target="APPLE_MUSIC_COUNTRY_CODE" Default="GB" Description="Two-letter storefront country code used for Apple Music metadata. No Apple credential is required." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="TIDAL Token" Target="TIDAL_TOKEN" Default="" Description="Optional TIDAL API token. TIDAL activates automatically when provided." Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="TIDAL Country Code" Target="TIDAL_COUNTRY_CODE" Default="GB" Description="Two-letter country code used for TIDAL metadata." Type="Variable" Display="advanced" Required="false" Mask="false"/>
   <Config Name="Log Level" Target="DIZZYBOT__LOGGING__LEVEL" Default="INFO" Description="Python bot log level." Type="Variable" Display="advanced" Required="false" Mask="false"/>
   <Config Name="Radio Station Limit" Target="DIZZYBOT__BOT__RADIO_STATION_LIMIT" Default="50" Description="Maximum number of saved radio stations per Discord server." Type="Variable" Display="advanced" Required="false" Mask="false"/>
   <Config Name="Allow Private Radio Streams" Target="DIZZYBOT__BOT__ALLOW_PRIVATE_RADIO_STREAMS" Default="false" Description="Allow saved radio URLs to reach private or local network addresses. Enable only for a trusted server." Type="Variable" Display="advanced" Required="false" Mask="false"/>

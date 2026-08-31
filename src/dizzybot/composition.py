@@ -74,9 +74,16 @@ def build_services(config: AppConfig) -> ServiceContainer:
     presenter = DefaultPresenter()
     permissions = DefaultPermissionPolicy()
     controls = DefaultPlaybackControls(bot, settings, permissions, presenter)
-    available_sources = {Source.YOUTUBE, Source.SOUNDCLOUD}
+    available_sources = {
+        Source.YOUTUBE,
+        Source.SOUNDCLOUD,
+        Source.APPLE_MUSIC,
+        Source.BANDCAMP,
+    }
     if config.spotify.configured:
         available_sources.add(Source.SPOTIFY)
+    if config.tidal.configured:
+        available_sources.add(Source.TIDAL)
     resolver = DefaultTrackResolver(audio, available_sources=available_sources)
     radio_resolver = DefaultRadioResolver(
         audio,

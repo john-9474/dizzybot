@@ -74,6 +74,12 @@ class DefaultAudioBackend(BaseAudioBackend):
             return Source.SOUNDCLOUD
         if "spotify" in normalized:
             return Source.SPOTIFY
+        if "apple" in normalized:
+            return Source.APPLE_MUSIC
+        if "tidal" in normalized:
+            return Source.TIDAL
+        if "bandcamp" in normalized:
+            return Source.BANDCAMP
         if "http" in normalized:
             return Source.RADIO
         return Source.YOUTUBE

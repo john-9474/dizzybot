@@ -12,8 +12,12 @@ implementations.
 ## Features
 
 - YouTube videos and playlists
+- YouTube Music links (through the YouTube source)
 - SoundCloud tracks and sets
 - Spotify track, album, and playlist links mirrored to YouTube or SoundCloud
+- Apple Music tracks, albums, and playlists mirrored to YouTube or SoundCloud
+- Optional TIDAL tracks, albums, and playlists mirrored to YouTube or SoundCloud
+- Bandcamp tracks and albums
 - Persistent per-server internet radio stations, with no stations imposed by default
 - Slash commands only; no message-content intent
 - Independent queues and playback in multiple Discord servers
@@ -26,9 +30,10 @@ implementations.
 - One-container Unraid template with bundled private Lavalink
 - Published `linux/amd64` and `linux/arm64` image workflow
 
-Spotify's API does not provide downloadable full-track audio for a Discord bot. DizzyBot uses
-[LavaSrc mirroring](https://github.com/topi314/LavaSrc): Spotify supplies metadata and a playable
-match is found on YouTube or SoundCloud. Operators must follow the terms of every configured media
+Spotify, Apple Music, and TIDAL are metadata sources rather than audio sources. DizzyBot uses
+[LavaSrc mirroring](https://github.com/topi314/LavaSrc/blob/4.8.3/README.md): the selected service supplies metadata and
+a playable match is found on YouTube or SoundCloud. Bandcamp, YouTube, SoundCloud, and saved radio
+streams are relayed directly by Lavalink. Operators must follow the terms of every configured media
 service. DizzyBot does not bypass DRM, download media, or cache audio.
 
 ## Unraid: one-container installation
@@ -41,7 +46,8 @@ process.
 Once the Community Applications listing is published:
 
 1. Open **Apps** in Unraid and search for **DizzyBot**.
-2. Select **Install**, enter the Discord bot token, and optionally enter both Spotify credentials.
+2. Select **Install** and enter the Discord bot token. Spotify and TIDAL credentials are optional;
+   Apple Music and Bandcamp work without additional credentials.
 3. Select **Apply**. The template creates the appdata mapping and starts the single container.
 
 The standalone image generates its internal Lavalink password automatically. It runs the bot and
@@ -59,7 +65,8 @@ Prerequisites:
 
 - Docker Engine with Docker Compose v2
 - A Discord application and bot token
-- Optional Spotify Premium account and developer application for Spotify links
+- Optional Spotify developer application for Spotify links
+- Optional LavaSrc-compatible TIDAL token for TIDAL links and searches
 
 1. In the [Discord Developer Portal](https://discord.com/developers/applications), create an
    application and bot. You do not need to enable Message Content Intent.
@@ -101,7 +108,20 @@ YouTube changes its playback interface frequently. DizzyBot therefore pins yt-dl
 reproducible, while subsequent DizzyBot releases can update the extractor independently of Lavalink.
 Occasional videos may still be unavailable because of regional, age, account, or rights restrictions.
 
-## Spotify setup
+## Music sources
+
+YouTube, YouTube Music, SoundCloud, Apple Music, and Bandcamp are available without provider
+credentials. Apple Music is a metadata source: the bundled LavaSrc plugin obtains its public media
+API token and mirrors matches to YouTube or SoundCloud. Set `APPLE_MUSIC_COUNTRY_CODE` to a
+two-letter storefront code if the default `GB` is not appropriate. Bandcamp public tracks and albums
+are loaded directly by Lavalink.
+
+For `/play` searches, `source` can be `auto`, `youtube`, `soundcloud`, `spotify`, `apple_music`,
+`tidal`, or `bandcamp`. You can also choose any configured source as a server's default with
+`/settings search-provider`. A URL automatically selects its matching source regardless of that
+default.
+
+### Spotify
 
 Create an application in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 and add these values to `.env`:
@@ -118,10 +138,30 @@ remain available and Spotify requests return a configuration error. Current Spot
 accounts require the application owner to have Premium and are subject to Spotify's user and quota
 limits.
 
+### TIDAL
+
+TIDAL support is optional because LavaSrc requires a compatible API token. Add it to `.env` or the
+TIDAL Token field in the Unraid template:
+
+```dotenv
+TIDAL_TOKEN=your-lavasrc-compatible-token
+TIDAL_COUNTRY_CODE=GB
+```
+
+Restart the container after changing it. TIDAL activates automatically when the token is non-empty;
+without one, its commands return an actionable configuration error and all other sources continue to
+work. DizzyBot does not collect TIDAL login details or browser session cookies, and the project does
+not issue provider tokens.
+
 The provided Compose stack reads all credentials from `.env`. Both containers also understand
 `*_FILE` variants for custom deployments that mount Docker secrets instead; supported names include
 `DISCORD_TOKEN_FILE`, `LAVALINK_PASSWORD_FILE`, `SPOTIFY_CLIENT_ID_FILE`, and
-`SPOTIFY_CLIENT_SECRET_FILE`.
+`SPOTIFY_CLIENT_SECRET_FILE`, and `TIDAL_TOKEN_FILE`.
+
+Amazon Music and Pandora are not supported by the pinned Lavalink plugins. Deezer, Qobuz, Yandex
+Music, VK Music, and JioSaavn are not enabled because their LavaSrc integrations play directly and
+may require private account/session credentials, decryption material, or region-specific setup.
+They can be evaluated separately in a fork without weakening the default public image.
 
 ## Internet radio
 

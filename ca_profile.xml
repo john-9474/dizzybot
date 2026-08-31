@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <CommunityApplications>
-  <Profile>DizzyBot is a fully open-source Discord music bot packaged for a one-container Unraid installation. The image includes its private Lavalink audio backend and supports YouTube, SoundCloud, user-managed internet radio stations, and optional Spotify metadata mirroring.</Profile>
+  <Profile>DizzyBot is a fully open-source Discord music bot packaged for a one-container Unraid installation. The image includes its private Lavalink audio backend and supports YouTube, SoundCloud, Bandcamp, Apple Music metadata mirroring, user-managed internet radio stations, and optional Spotify and TIDAL metadata mirroring.</Profile>
   <Icon>https://raw.githubusercontent.com/john-9474/dizzybot/main/assets/dizzybot.svg</Icon>
   <WebPage>https://github.com/john-9474/dizzybot</WebPage>
 </CommunityApplications>

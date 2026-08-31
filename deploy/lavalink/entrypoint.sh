@@ -17,9 +17,14 @@ load_secret() {
 load_secret LAVALINK_PASSWORD
 load_secret SPOTIFY_CLIENT_ID
 load_secret SPOTIFY_CLIENT_SECRET
+load_secret TIDAL_TOKEN
 
 if [ -n "${SPOTIFY_CLIENT_ID:-}" ] && [ -n "${SPOTIFY_CLIENT_SECRET:-}" ]; then
   export LAVASRC_SPOTIFY_CONFIGURED=true
+fi
+
+if [ -n "${TIDAL_TOKEN:-}" ]; then
+  export LAVASRC_TIDAL_CONFIGURED=true
 fi
 
 if [ -z "${LAVALINK_PASSWORD:-}" ]; then

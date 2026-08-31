@@ -79,6 +79,16 @@ class SpotifyConfig(BaseModel):
         )
 
 
+class TidalConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: SecretStr | None = None
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.token is not None and self.token.get_secret_value().strip())
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -88,6 +98,7 @@ class AppConfig(BaseModel):
     health: HealthConfig = HealthConfig()
     logging: LoggingConfig = LoggingConfig()
     spotify: SpotifyConfig = SpotifyConfig()
+    tidal: TidalConfig = TidalConfig()
 
 
 _DIRECT_SECRETS = {
@@ -95,6 +106,7 @@ _DIRECT_SECRETS = {
     "LAVALINK_PASSWORD": ("lavalink", "password"),
     "SPOTIFY_CLIENT_ID": ("spotify", "client_id"),
     "SPOTIFY_CLIENT_SECRET": ("spotify", "client_secret"),
+    "TIDAL_TOKEN": ("tidal", "token"),
 }
 
 

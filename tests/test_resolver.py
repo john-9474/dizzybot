@@ -5,7 +5,16 @@ from dizzybot.domain import BackendLoadResult, ResolveRequest, Source
 from dizzybot.errors import InvalidRequestError, MediaUnavailableError, SourceUnavailableError
 from tests.fakes import FakeAudioBackend, make_track
 
-ALL_SOURCES = frozenset({Source.YOUTUBE, Source.SOUNDCLOUD, Source.SPOTIFY})
+ALL_SOURCES = frozenset(
+    {
+        Source.YOUTUBE,
+        Source.SOUNDCLOUD,
+        Source.SPOTIFY,
+        Source.APPLE_MUSIC,
+        Source.TIDAL,
+        Source.BANDCAMP,
+    }
+)
 
 
 @pytest.mark.parametrize(
@@ -15,6 +24,9 @@ ALL_SOURCES = frozenset({Source.YOUTUBE, Source.SOUNDCLOUD, Source.SPOTIFY})
         ("https://music.youtube.com/watch?v=id", Source.YOUTUBE),
         ("https://soundcloud.com/a/b", Source.SOUNDCLOUD),
         ("https://open.spotify.com/track/id", Source.SPOTIFY),
+        ("https://music.apple.com/gb/album/name/id", Source.APPLE_MUSIC),
+        ("https://listen.tidal.com/album/id", Source.TIDAL),
+        ("https://artist.bandcamp.com/track/name", Source.BANDCAMP),
         ("words", None),
     ],
 )
@@ -44,6 +56,29 @@ async def test_search_uses_prefix_and_only_first_result() -> None:
     assert result.tracks[0].requested_by == 42
 
 
+@pytest.mark.parametrize(
+    ("source", "prefix"),
+    [
+        (Source.SPOTIFY, "spsearch:"),
+        (Source.APPLE_MUSIC, "amsearch:"),
+        (Source.TIDAL, "tdsearch:"),
+        (Source.BANDCAMP, "bcsearch:"),
+    ],
+)
+async def test_provider_search_prefixes(source: Source, prefix: str) -> None:
+    backend = FakeAudioBackend()
+    resolver = DefaultTrackResolver(backend, available_sources=ALL_SOURCES)
+    captured: list[str] = []
+
+    async def load(identifier: str) -> BackendLoadResult:
+        captured.append(identifier)
+        return BackendLoadResult((make_track(),))
+
+    backend.load_tracks = load
+    await resolver.resolve(ResolveRequest("query", source, 1, 10))
+    assert captured == [f"{prefix}query"]
+
+
 async def test_playlist_filters_streams_and_caps_result() -> None:
     backend = FakeAudioBackend()
     backend.loaded = BackendLoadResult(
@@ -69,6 +104,8 @@ async def test_resolver_reports_source_and_media_errors() -> None:
     resolver = DefaultTrackResolver(backend, available_sources={Source.YOUTUBE, Source.SOUNDCLOUD})
     with pytest.raises(SourceUnavailableError):
         await resolver.resolve(ResolveRequest("song", Source.SPOTIFY, 1, 10))
+    with pytest.raises(SourceUnavailableError, match="TIDAL_TOKEN"):
+        await resolver.resolve(ResolveRequest("song", Source.TIDAL, 1, 10))
     with pytest.raises(InvalidRequestError, match="radio play"):
         await resolver.resolve(ResolveRequest("station", Source.RADIO, 1, 10))
     with pytest.raises(InvalidRequestError, match="Only YouTube"):

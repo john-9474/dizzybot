@@ -10,7 +10,7 @@ lavalink:
     password: "${LAVALINK_PASSWORD}"
     sources:
       youtube: false
-      bandcamp: false
+      bandcamp: true
       soundcloud: true
       twitch: false
       vimeo: false
@@ -51,13 +51,13 @@ plugins:
       - "scsearch:%QUERY%"
     sources:
       spotify: ${LAVASRC_SPOTIFY_CONFIGURED:false}
-      applemusic: false
+      applemusic: true
       deezer: false
       yandexmusic: false
       flowerytts: false
       youtube: false
       vkmusic: false
-      tidal: false
+      tidal: ${LAVASRC_TIDAL_CONFIGURED:false}
       qobuz: false
       ytdlp: true
       jiosaavn: false
@@ -78,6 +78,14 @@ plugins:
       localFiles: false
       preferPartnerApi: false
       preferV1SearchApi: false
+    applemusic:
+      countryCode: "${APPLE_MUSIC_COUNTRY_CODE:GB}"
+      playlistLoadLimit: 1
+      albumLoadLimit: 1
+    tidal:
+      countryCode: "${TIDAL_COUNTRY_CODE:GB}"
+      searchLimit: 10
+      token: "${TIDAL_TOKEN:}"
     ytdlp:
       path: "/usr/local/bin/yt-dlp"
       searchLimit: 10

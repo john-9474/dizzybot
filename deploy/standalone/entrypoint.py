@@ -16,6 +16,7 @@ _SECRET_NAMES = (
     "LAVALINK_PASSWORD",
     "SPOTIFY_CLIENT_ID",
     "SPOTIFY_CLIENT_SECRET",
+    "TIDAL_TOKEN",
 )
 
 
@@ -55,6 +56,13 @@ def _configure_environment() -> None:
                 file=sys.stderr,
                 flush=True,
             )
+
+    optional_sources = (("TIDAL_TOKEN", "LAVASRC_TIDAL_CONFIGURED"),)
+    for token_name, enabled_name in optional_sources:
+        if os.environ.get(token_name, "").strip():
+            os.environ[enabled_name] = "true"
+        else:
+            os.environ.pop(enabled_name, None)
 
 
 def _runtime_ids() -> tuple[int, int]:

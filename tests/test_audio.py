@@ -131,6 +131,22 @@ async def test_audio_loads_lists_playlists_and_maps_sources(
     assert result.playlist_name == "List"
     assert result.tracks[0].source is Source.SPOTIFY
 
+    for source_name, expected in (
+        ("applemusic", Source.APPLE_MUSIC),
+        ("tidal", Source.TIDAL),
+        ("bandcamp", Source.BANDCAMP),
+    ):
+
+        async def fetch_provider(
+            query: str, *, provider: str = source_name
+        ) -> list[wavelink.Playable]:
+            del query
+            return [playable(provider, source=provider)]
+
+        monkeypatch.setattr(wavelink.Pool, "fetch_tracks", fetch_provider)
+        result = await audio.load_tracks(f"{source_name}-url")
+        assert result.tracks[0].source is expected
+
 
 async def test_audio_load_failure_and_not_ready(monkeypatch: pytest.MonkeyPatch) -> None:
     audio = backend()

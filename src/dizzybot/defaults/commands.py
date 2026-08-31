@@ -127,6 +127,9 @@ class DefaultMusicCommands(ErrorHandlingCog, commands.Cog, BaseMusicCommands):
             app_commands.Choice(name="YouTube", value="youtube"),
             app_commands.Choice(name="SoundCloud", value="soundcloud"),
             app_commands.Choice(name="Spotify", value="spotify"),
+            app_commands.Choice(name="Apple Music", value="apple_music"),
+            app_commands.Choice(name="TIDAL", value="tidal"),
+            app_commands.Choice(name="Bandcamp", value="bandcamp"),
         ]
     )
     async def play(
@@ -426,6 +429,9 @@ class DefaultSettingsCommands(
             app_commands.Choice(name="YouTube", value="youtube"),
             app_commands.Choice(name="SoundCloud", value="soundcloud"),
             app_commands.Choice(name="Spotify", value="spotify"),
+            app_commands.Choice(name="Apple Music", value="apple_music"),
+            app_commands.Choice(name="TIDAL", value="tidal"),
+            app_commands.Choice(name="Bandcamp", value="bandcamp"),
         ]
     )
     async def search_provider(
@@ -433,8 +439,13 @@ class DefaultSettingsCommands(
     ) -> None:
         selected = Source(source.value)
         if selected not in self._available_sources:
+            setup = {
+                Source.SPOTIFY: "SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET",
+                Source.TIDAL: "TIDAL_TOKEN",
+            }.get(selected)
+            detail = f" Provide {setup} first." if setup else ""
             raise InvalidRequestError(
-                "Provide both SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET before selecting Spotify."
+                f"{selected.value.replace('_', ' ').title()} is not configured.{detail}"
             )
         settings = await self._settings.get(self._guild_id(interaction))
         await self._save(replace(settings, default_search_source=selected))
