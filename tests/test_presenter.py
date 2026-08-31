@@ -117,6 +117,7 @@ async def test_presenter_initial_followup_and_notification() -> None:
     followup = SimpleNamespace(response=Response(True), followup=Sender())
     await presenter.respond(followup, "Title", "Body")
     assert followup.followup.messages
+    assert "view" not in followup.followup.messages[0]
 
     channel = Sender()
     presenter.attach(

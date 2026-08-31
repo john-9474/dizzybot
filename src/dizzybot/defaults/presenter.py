@@ -196,9 +196,9 @@ class DefaultPresenter(BasePresenter):
                 options: dict[str, Any] = {
                     "embed": embed,
                     "ephemeral": ephemeral,
-                    "view": view,
                 }
                 if view is not None:
+                    options["view"] = view
                     options["wait"] = True
                 return await interaction.followup.send(**options)
             await interaction.response.send_message(
