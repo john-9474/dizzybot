@@ -183,6 +183,12 @@ async def test_audio_player_controls_and_events(monkeypatch: pytest.MonkeyPatch)
         )
     )
     await audio._on_track_exception(SimpleNamespace(player=event_player, track=event_track))
+    assert [event[1] for event in events] == [PlaybackEndReason.FINISHED]
+    await audio._on_track_end(
+        SimpleNamespace(
+            player=event_player, reason="finished", original=event_track, track=event_track
+        )
+    )
     await audio._on_track_stuck(SimpleNamespace(player=event_player, track=event_track))
     assert [event[1] for event in events] == [
         PlaybackEndReason.FINISHED,
@@ -231,3 +237,30 @@ async def test_audio_refreshes_soundcloud_track_before_playback(
         SimpleNamespace(player=event_player, reason="finished", original=fresh, track=fresh)
     )
     assert events[-1][2] == original.encoded
+
+
+async def test_audio_refreshes_radio_stream_before_playback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audio = backend()
+    player = FakeWavelinkPlayer(5)
+
+    async def channel_connect(**kwargs: Any) -> FakeWavelinkPlayer:
+        del kwargs
+        return player
+
+    await audio.connect(1, SimpleNamespace(id=5, connect=channel_connect))
+    original = playable("radio-id", source="http", stream=True)
+    fresh_data = dict(original.raw_data)
+    fresh_data["encoded"] = "fresh-radio-encoded"
+    fresh = wavelink.Playable(fresh_data)
+
+    async def fetch_tracks(query: str) -> list[wavelink.Playable]:
+        assert query == original.uri
+        return [fresh]
+
+    monkeypatch.setattr(wavelink.Pool, "fetch_tracks", fetch_tracks)
+    track = audio._track(original)
+    await audio.play(1, track, 70)
+
+    assert player.played is fresh

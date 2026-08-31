@@ -12,6 +12,7 @@ from dizzybot.domain import (
     PlaybackEndReason,
     RepeatMode,
     ResolveResult,
+    Source,
 )
 from dizzybot.errors import InvalidRequestError, PlayerStateError, QueueLimitError
 from tests.fakes import (
@@ -133,6 +134,38 @@ async def test_failed_tracks_notify_and_continue() -> None:
     assert presenter.notifications[-1][1] == "Playback error"
 
 
+async def test_failed_radio_reconnects_before_advancing_queue() -> None:
+    player, audio, presenter = make_player()
+    await connect(player)
+    radio = make_track("radio", source=Source.RADIO, stream=True, seekable=False)
+    following = make_track("following")
+    await player.enqueue(ResolveResult((radio, following)), 33)
+
+    await player.handle_track_end(PlaybackEndReason.LOAD_FAILED, radio.backend_key)
+
+    snapshot = await player.snapshot()
+    assert snapshot.current == radio
+    assert snapshot.upcoming == (following,)
+    assert [call[1] for call in audio.played] == [radio, radio]
+    assert presenter.notifications[-1][1] == "Radio reconnected"
+
+
+async def test_radio_advances_after_reconnect_limit_is_exhausted() -> None:
+    player, audio, presenter = make_player()
+    await connect(player)
+    radio = make_track("radio", source=Source.RADIO, stream=True, seekable=False)
+    following = make_track("following")
+    await player.enqueue(ResolveResult((radio, following)), 33)
+
+    for _ in range(player.RADIO_RETRY_LIMIT + 1):
+        await player.handle_track_end(PlaybackEndReason.LOAD_FAILED, radio.backend_key)
+
+    assert (await player.snapshot()).current == following
+    assert [call[1] for call in audio.played] == [radio, radio, radio, radio, following]
+    assert presenter.notifications[-1][1] == "Playback error"
+    assert "3 reconnect attempts" in presenter.notifications[-1][2]
+
+
 async def test_ignored_backend_event_does_not_skip_new_track() -> None:
     player, _, _ = make_player()
     await connect(player)
@@ -177,13 +210,15 @@ async def test_idle_disconnects_empty_or_humanless_player() -> None:
     await asyncio.sleep(0.01)
     assert player.is_connected() is False
     assert presenter.notifications[-1][1] == "Disconnected"
+    assert "no active playback" in presenter.notifications[-1][2]
 
-    player, _, _ = make_player(idle_timeout=0)
+    player, _, presenter = make_player(idle_timeout=0)
     await connect(player)
     await player.enqueue(ResolveResult((make_track(),)), 33)
     await player.update_human_presence(False)
     await asyncio.sleep(0.01)
     assert player.is_connected() is False
+    assert "without any human listeners" in presenter.notifications[-1][2]
 
 
 async def test_reconnect_resets_stale_empty_channel_presence_for_radio() -> None:

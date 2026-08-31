@@ -143,7 +143,8 @@ because the saved URL causes the self-hosted audio service to make an outbound c
 embedded credentials and URLs resolving to local, private, link-local, or reserved addresses are
 blocked by default. A trusted private deployment can opt in with
 `bot.allow_private_radio_streams: true`. Radio streams remain subject to the configured idle/empty
-channel timeout and 24/7 mode.
+channel timeout and 24/7 mode. If an upstream live stream times out or ends unexpectedly, DizzyBot
+reloads its media URL and attempts to reconnect up to three times before continuing with the queue.
 
 ## Commands
 

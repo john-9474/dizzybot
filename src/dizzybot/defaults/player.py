@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 from collections import Counter
 from collections.abc import Callable
 from typing import Any
@@ -21,15 +22,19 @@ from dizzybot.domain import (
     QueueSnapshot,
     RepeatMode,
     ResolveResult,
+    Source,
     Track,
 )
 from dizzybot.errors import InvalidRequestError, PlayerStateError, QueueLimitError
 
 GuildPlayerFactory = Callable[..., BaseGuildPlayer]
 QueueFactory = Callable[[], BaseQueue]
+LOGGER = logging.getLogger(__name__)
 
 
 class DefaultGuildPlayer(BaseGuildPlayer):
+    RADIO_RETRY_LIMIT = 3
+
     def __init__(
         self,
         guild_id: int,
@@ -53,6 +58,8 @@ class DefaultGuildPlayer(BaseGuildPlayer):
         self._has_humans = True
         self._idle_task: asyncio.Task[None] | None = None
         self._ignored_end_events: Counter[str] = Counter()
+        self._radio_retry_key: str | None = None
+        self._radio_retry_attempts = 0
         self._lock = asyncio.Lock()
 
     async def connect(self, channel: Any, announce_channel_id: int) -> None:
@@ -67,6 +74,12 @@ class DefaultGuildPlayer(BaseGuildPlayer):
                 True
                 if members is None
                 else any(not getattr(member, "bot", False) for member in members)
+            )
+            LOGGER.info(
+                "Connected guild %d to voice channel %s (human listeners: %s)",
+                self.guild_id,
+                getattr(channel, "id", "unknown"),
+                self._has_humans,
             )
             await self._backend.set_volume(self.guild_id, self._volume)
             self._refresh_idle_timer_locked()
@@ -89,12 +102,17 @@ class DefaultGuildPlayer(BaseGuildPlayer):
         while self._queue.current is None:
             track = self._queue.take_next()
             if track is None:
+                self._radio_retry_key = None
+                self._radio_retry_attempts = 0
                 self._refresh_idle_timer_locked()
                 await self._controls.clear(self.guild_id)
                 return
+            self._radio_retry_key = self._track_retry_key(track)
+            self._radio_retry_attempts = 0
             try:
                 await self._backend.play(self.guild_id, track, self._volume)
             except Exception:
+                LOGGER.exception("Could not start track %r in guild %d", track.title, self.guild_id)
                 self._queue.complete_current(PlaybackEndReason.LOAD_FAILED)
                 if self._announce_channel_id is not None:
                     await self._presenter.notify(
@@ -133,6 +151,10 @@ class DefaultGuildPlayer(BaseGuildPlayer):
         current = self._queue.current
         if current is not None and current.backend_key:
             self._ignored_end_events[current.backend_key] += 1
+
+    @staticmethod
+    def _track_retry_key(track: Track) -> str:
+        return track.backend_key or f"{track.source.value}:{track.identifier}"
 
     async def leave(self) -> None:
         async with self._lock:
@@ -179,6 +201,8 @@ class DefaultGuildPlayer(BaseGuildPlayer):
         async with self._lock:
             interrupted = self._require_current()
             track = self._queue.take_previous()
+            self._radio_retry_key = self._track_retry_key(track)
+            self._radio_retry_attempts = 0
             if interrupted.backend_key:
                 self._ignored_end_events[interrupted.backend_key] += 1
             await self._backend.stop(self.guild_id)
@@ -276,18 +300,77 @@ class DefaultGuildPlayer(BaseGuildPlayer):
             if backend_key and current.backend_key and backend_key != current.backend_key:
                 return
             failed = reason in {PlaybackEndReason.LOAD_FAILED, PlaybackEndReason.STUCK}
+            retryable_radio_end = current.source is Source.RADIO and (
+                failed or reason is PlaybackEndReason.FINISHED
+            )
+            if retryable_radio_end and await self._retry_radio_locked(current, reason):
+                return
             self._queue.complete_current(reason)
             if failed and self._announce_channel_id is not None:
+                retry_detail = (
+                    f" after {self._radio_retry_attempts} reconnect attempts"
+                    if current.source is Source.RADIO and self._radio_retry_attempts
+                    else ""
+                )
                 await self._presenter.notify(
                     self._announce_channel_id,
                     "Playback error",
-                    f"**{current.title}** failed; continuing with the queue.",
+                    f"**{current.title}** failed{retry_detail}; continuing with the queue.",
                     error=True,
                 )
             await self._play_next_locked()
 
+    async def _retry_radio_locked(self, track: Track, reason: PlaybackEndReason) -> bool:
+        retry_key = self._track_retry_key(track)
+        if self._radio_retry_key != retry_key:
+            self._radio_retry_key = retry_key
+            self._radio_retry_attempts = 0
+        if self._radio_retry_attempts >= self.RADIO_RETRY_LIMIT:
+            LOGGER.warning(
+                "Radio stream %r in guild %d exhausted %d reconnect attempts",
+                track.title,
+                self.guild_id,
+                self.RADIO_RETRY_LIMIT,
+            )
+            return False
+
+        self._radio_retry_attempts += 1
+        attempt = self._radio_retry_attempts
+        LOGGER.warning(
+            "Radio stream %r ended with %s in guild %d; reconnecting (%d/%d)",
+            track.title,
+            reason.value,
+            self.guild_id,
+            attempt,
+            self.RADIO_RETRY_LIMIT,
+        )
+        try:
+            await self._backend.play(self.guild_id, track, self._volume)
+        except Exception:
+            LOGGER.exception(
+                "Radio reconnect failed for %r in guild %d", track.title, self.guild_id
+            )
+            return False
+
+        self._refresh_idle_timer_locked()
+        await self._update_controls_locked()
+        if self._announce_channel_id is not None:
+            await self._presenter.notify(
+                self._announce_channel_id,
+                "Radio reconnected",
+                f"**{track.title}** was interrupted and resumed automatically "
+                f"(attempt {attempt}/{self.RADIO_RETRY_LIMIT}).",
+            )
+        return True
+
     async def update_human_presence(self, has_humans: bool) -> None:
         async with self._lock:
+            if has_humans != self._has_humans:
+                LOGGER.info(
+                    "Human listener presence for guild %d changed to %s",
+                    self.guild_id,
+                    has_humans,
+                )
             self._has_humans = has_humans
             self._refresh_idle_timer_locked()
 
@@ -317,6 +400,13 @@ class DefaultGuildPlayer(BaseGuildPlayer):
         if not self._should_idle_disconnect():
             self._cancel_idle_timer_locked()
         elif self._idle_task is None or self._idle_task.done():
+            reason = "no active playback" if self._queue.current is None else "no human listeners"
+            LOGGER.info(
+                "Scheduling voice disconnect for guild %d in %d seconds: %s",
+                self.guild_id,
+                self._settings.idle_timeout_seconds,
+                reason,
+            )
             self._idle_task = asyncio.create_task(
                 self._idle_disconnect_after_delay(),
                 name=f"dizzybot-idle-{self.guild_id}",
@@ -334,16 +424,31 @@ class DefaultGuildPlayer(BaseGuildPlayer):
                 if not self._should_idle_disconnect():
                     return
                 channel_id = self._announce_channel_id
+                no_active_playback = self._queue.current is None
+                reason = "no active playback" if no_active_playback else "no human listeners"
+                LOGGER.info(
+                    "Disconnecting guild %d after %d seconds: %s",
+                    self.guild_id,
+                    self._settings.idle_timeout_seconds,
+                    reason,
+                )
                 self._ignore_current_end_locked()
                 self._queue.reset()
                 await self._backend.disconnect(self.guild_id)
                 self._idle_task = None
                 await self._controls.clear(self.guild_id)
                 if channel_id is not None:
+                    detail = (
+                        f"Left voice after **{self._settings.idle_timeout_seconds} seconds** "
+                        "with no active playback."
+                        if no_active_playback
+                        else f"Left voice after **{self._settings.idle_timeout_seconds} seconds** "
+                        "without any human listeners."
+                    )
                     await self._presenter.notify(
                         channel_id,
                         "Disconnected",
-                        "Left voice after the configured empty/idle timeout.",
+                        detail,
                     )
         except asyncio.CancelledError:
             raise

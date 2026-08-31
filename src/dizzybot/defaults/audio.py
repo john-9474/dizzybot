@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from collections.abc import Iterable
 from typing import Any, ClassVar
 
@@ -28,6 +29,7 @@ class DefaultAudioBackend(BaseAudioBackend):
         self._handler: AudioEventHandler | None = None
         self._players: dict[int, wavelink.Player] = {}
         self._backend_key_aliases: dict[int, dict[str, str]] = {}
+        self._track_exceptions: dict[int, Counter[str]] = {}
         self._ready = False
         self._client: Any | None = None
 
@@ -128,6 +130,7 @@ class DefaultAudioBackend(BaseAudioBackend):
     async def disconnect(self, guild_id: int) -> None:
         player = self._players.pop(guild_id, None)
         self._backend_key_aliases.pop(guild_id, None)
+        self._track_exceptions.pop(guild_id, None)
         if player is not None and player.connected:
             await player.disconnect()
 
@@ -143,6 +146,8 @@ class DefaultAudioBackend(BaseAudioBackend):
         playable = track.backend_data
         if track.source is Source.SOUNDCLOUD:
             playable = await self._refresh_soundcloud_track(track, playable)
+        elif track.source is Source.RADIO:
+            playable = await self._refresh_radio_track(track, playable)
         if playable.encoded and track.backend_key:
             aliases = self._backend_key_aliases.setdefault(guild_id, {})
             aliases[playable.encoded] = track.backend_key
@@ -162,6 +167,18 @@ class DefaultAudioBackend(BaseAudioBackend):
             (candidate for candidate in candidates if candidate.identifier == track.identifier),
             candidates[0] if candidates else original,
         )
+
+    async def _refresh_radio_track(
+        self, track: Track, original: wavelink.Playable
+    ) -> wavelink.Playable:
+        """Reload a live stream so a reconnect uses a fresh manifest or media URL."""
+        try:
+            loaded = await wavelink.Pool.fetch_tracks(track.uri)
+        except Exception as error:
+            LOGGER.warning("Could not refresh radio stream %r: %s", track.uri, error)
+            return original
+        candidates = loaded.tracks if isinstance(loaded, wavelink.Playlist) else loaded
+        return candidates[0] if candidates else original
 
     async def stop(self, guild_id: int) -> None:
         player = self._player(guild_id)
@@ -216,10 +233,29 @@ class DefaultAudioBackend(BaseAudioBackend):
 
     async def _on_track_end(self, payload: wavelink.TrackEndEventPayload) -> None:
         reason = self._END_REASONS.get(payload.reason.lower(), PlaybackEndReason.STOPPED)
+        guild_id = self._guild_id(payload)
+        backend_key = self._backend_key(payload)
+        if guild_id is not None and backend_key is not None:
+            exceptions = self._track_exceptions.get(guild_id)
+            if exceptions and exceptions[backend_key]:
+                exceptions[backend_key] -= 1
+                if not exceptions[backend_key]:
+                    del exceptions[backend_key]
+                if not exceptions:
+                    self._track_exceptions.pop(guild_id, None)
+                reason = PlaybackEndReason.LOAD_FAILED
         await self._dispatch(payload, reason)
 
     async def _on_track_exception(self, payload: wavelink.TrackExceptionEventPayload) -> None:
-        await self._dispatch(payload, PlaybackEndReason.LOAD_FAILED)
+        # Lavalink follows a TrackExceptionEvent with a TrackEndEvent. Remember
+        # the exception and normalize that single end event as a load failure,
+        # avoiding two independent queue advances for the same track.
+        guild_id = self._guild_id(payload)
+        backend_key = self._backend_key(payload)
+        if guild_id is None or backend_key is None:
+            await self._dispatch(payload, PlaybackEndReason.LOAD_FAILED)
+            return
+        self._track_exceptions.setdefault(guild_id, Counter())[backend_key] += 1
 
     async def _on_track_stuck(self, payload: wavelink.TrackStuckEventPayload) -> None:
         await self._dispatch(payload, PlaybackEndReason.STUCK)
