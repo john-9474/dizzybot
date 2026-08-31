@@ -30,9 +30,25 @@ def test_unraid_template_deploys_one_combined_container() -> None:
     assert configs["DISCORD_TOKEN"]["Mask"] == "true"
     assert configs["TIDAL_TOKEN"]["Required"] == "false"
     assert configs["TIDAL_TOKEN"]["Mask"] == "true"
-    assert configs["DIZZYBOT__BOT__REPOST_PLAYER_CONTROLS"]["Default"] == "true"
+    expected_bot_settings = {
+        "DIZZYBOT__BOT__DEFAULT_VOLUME": "75",
+        "DIZZYBOT__BOT__IDLE_TIMEOUT_SECONDS": "300",
+        "DIZZYBOT__BOT__STAY_CONNECTED": "false",
+        "DIZZYBOT__BOT__DEFAULT_SEARCH_SOURCE": "youtube",
+        "DIZZYBOT__BOT__PLAYLIST_TRACK_LIMIT": "100",
+        "DIZZYBOT__BOT__QUEUE_TRACK_LIMIT": "500",
+        "DIZZYBOT__BOT__RADIO_STATION_LIMIT": "50",
+        "DIZZYBOT__BOT__ALLOW_PRIVATE_RADIO_STREAMS": "false",
+        "DIZZYBOT__BOT__REPOST_PLAYER_CONTROLS": "true",
+        "DIZZYBOT__BOT__COMMAND_SYNC_GUILD_ID": "null",
+    }
+    for target, default in expected_bot_settings.items():
+        assert configs[target]["Default"] == default
     assert configs["/data"]["Default"] == "/mnt/user/appdata/dizzybot"
     assert "LAVALINK_PASSWORD" not in configs
+    assert "DIZZYBOT__DATABASE__URL" not in configs
+    assert "DIZZYBOT__HEALTH__PORT" not in configs
+    assert "DIZZYBOT__LAVALINK__URI" not in configs
     assert not any(item.attrib.get("Type") == "Port" for item in template.findall("Config"))
 
     dockerfile = (ROOT / "deploy" / "standalone" / "Dockerfile").read_text(encoding="utf-8")
@@ -43,6 +59,31 @@ def test_unraid_template_deploys_one_combined_container() -> None:
 
     profile = ElementTree.parse(ROOT / "ca_profile.xml").getroot()
     assert profile.tag == "CommunityApplications"
+
+
+def test_compose_env_exposes_the_same_bot_settings_as_unraid() -> None:
+    template = ElementTree.parse(ROOT / "templates" / "dizzybot.xml").getroot()
+    unraid_targets = {
+        item.attrib["Target"]
+        for item in template.findall("Config")
+        if item.attrib["Target"].startswith("DIZZYBOT__BOT__")
+    }
+    compose = yaml.safe_load((ROOT / "compose.yaml").read_text(encoding="utf-8"))
+    bot_environment = compose["services"]["bot"]["environment"]
+    compose_targets = {target for target in bot_environment if target.startswith("DIZZYBOT__BOT__")}
+    env_names = {
+        line.split("=", maxsplit=1)[0]
+        for line in (ROOT / ".env.example").read_text(encoding="utf-8").splitlines()
+        if line and not line.startswith("#")
+    }
+    compose_source_names = {
+        value.removeprefix("${").split(":", maxsplit=1)[0]
+        for target, value in bot_environment.items()
+        if target.startswith("DIZZYBOT__BOT__")
+    }
+
+    assert unraid_targets == compose_targets
+    assert compose_source_names <= env_names
 
 
 def test_lavalink_uses_bundled_ytdlp_for_youtube() -> None:

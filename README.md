@@ -50,10 +50,19 @@ Once the Community Applications listing is published:
    Apple Music and Bandcamp work without additional credentials.
 3. Select **Apply**. The template creates the appdata mapping and starts the single container.
 
+The Unraid form exposes every user-facing bot default and deployment-wide limit under **Show more
+settings**. Unraid turns those fields directly into container environment variables; it does not
+read this repository's `.env` file and does not require a custom YAML file.
+
 The standalone image generates its internal Lavalink password automatically. It runs the bot and
 Lavalink as Unraid's standard UID/GID `99:100`, persists server settings under
 `/mnt/user/appdata/dizzybot`, supervises both processes, and stops the whole container if either one
 fails. The source for the listing is [`templates/dizzybot.xml`](templates/dizzybot.xml).
+
+Unraid stores an installed app's form as a local template. Consequently, newly added fields may not
+appear when only the container image is updated. Existing installations can add the documented
+environment variable manually, or install from a fresh Community Applications template while
+retaining the `/mnt/user/appdata/dizzybot` mapping and its database.
 
 The template and image publication workflow are included in this repository. The listing will become
 searchable after a tagged image has been published to the public GHCR package and the template has
@@ -81,7 +90,8 @@ Prerequisites:
 
    Set `DISCORD_TOKEN` to the bot token and `LAVALINK_PASSWORD` to a long random value. The same
    Lavalink password is passed to both containers automatically. The repository ignores `.env`, but
-   you should still restrict access to it and never commit or share it.
+   you should still restrict access to it and never commit or share it. This `.env` file is read by
+   Docker Compose for variable substitution; DizzyBot does not search for or load `.env` files.
 
 4. Start both containers:
 
@@ -234,9 +244,25 @@ configured DJ role can use `/settings 24-7 enabled:true` to suppress automatic d
 
 ## Configuration
 
-[`config.example.yml`](config.example.yml) contains every ordinary deployment setting. The container
-uses this file by default. To customize it, copy the file and mount it at
-`/etc/dizzybot/config.yml:ro`.
+There are three deployment interfaces and one persistent per-server layer:
+
+| Interface | Intended use | How values reach DizzyBot |
+| --- | --- | --- |
+| Unraid template fields | Normal one-container Unraid installations | Unraid creates container environment variables |
+| `.env` | The supplied Docker Compose stack only | Compose substitutes values into `compose.yaml`, which passes them to the containers |
+| `config.yml` | Advanced/custom Docker deployments and forks | DizzyBot reads the mounted YAML file directly |
+| `/settings` commands | Individual Discord-server preferences | Values are persisted in `/data/dizzybot.sqlite3` |
+
+[`config.example.yml`](config.example.yml) is the canonical structured reference and contains every
+ordinary application setting, including internal defaults used by the packaged images. A custom
+deployment can copy it and mount the result at `/etc/dizzybot/config.yml:ro`. Normal Unraid users do
+not need this mount, and `.env` is not used by Unraid.
+
+The Unraid template and Compose `.env.example` expose the user-relevant bot options: default volume,
+idle timeout, default 24/7 mode, default search source, playlist/queue/radio limits, private radio
+access, and player-panel reposting. Database, health, and private Lavalink connection values remain
+internal in the standalone image because changing them would conflict with its volume, health check,
+or bundled audio process.
 
 Environment variables beginning with `DIZZYBOT__` override nested YAML keys. For example:
 
@@ -249,9 +275,15 @@ DIZZYBOT__BOT__COMMAND_SYNC_GUILD_ID=123456789012345678
 DIZZYBOT__HEALTH__PORT=8081
 ```
 
-Precedence is environment override, direct credential/credential file, YAML, then built-in default. Playlist
-and total queue limits must be between 1 and 500. A development guild ID makes slash commands sync
-immediately to that guild; omit it in production to use global commands.
+Configuration precedence is `DIZZYBOT__...` environment override, direct credential or credential
+file, YAML, then built-in default. Playlist and total queue limits must be between 1 and 500. A
+development guild ID makes slash commands sync immediately to that guild; leave it as `null` in
+production to use global commands.
+
+Default volume, idle timeout, 24/7 mode, and search source are starting values for each Discord
+server. Once changed through `/settings`, the server's SQLite value takes precedence over the
+deployment default. `/settings reset` restores the currently configured deployment defaults. Queue,
+playlist-import, and saved-radio limits remain deployment-wide caps.
 
 Persistent server settings and saved radio stations live in `/data/dizzybot.sqlite3`. Queues, voice
 sessions, repeat state, and session volume intentionally do not survive restarts. Back up the `/data`
