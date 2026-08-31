@@ -59,6 +59,15 @@ class DefaultGuildPlayer(BaseGuildPlayer):
         async with self._lock:
             await self._backend.connect(self.guild_id, channel)
             self._announce_channel_id = announce_channel_id
+            # Player instances survive voice disconnects. Re-establish presence from
+            # the newly joined channel so an empty-channel state from the previous
+            # session cannot disconnect active playback after the idle timeout.
+            members = getattr(channel, "members", None)
+            self._has_humans = (
+                True
+                if members is None
+                else any(not getattr(member, "bot", False) for member in members)
+            )
             await self._backend.set_volume(self.guild_id, self._volume)
             self._refresh_idle_timer_locked()
 

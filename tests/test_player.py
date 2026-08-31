@@ -186,6 +186,27 @@ async def test_idle_disconnects_empty_or_humanless_player() -> None:
     assert player.is_connected() is False
 
 
+async def test_reconnect_resets_stale_empty_channel_presence_for_radio() -> None:
+    player, _, presenter = make_player(idle_timeout=0)
+    human = SimpleNamespace(bot=False)
+    channel = SimpleNamespace(id=22, members=[human])
+
+    await player.connect(channel, 33)
+    await player.enqueue(ResolveResult((make_track(),)), 33)
+    await player.update_human_presence(False)
+    await asyncio.sleep(0.01)
+    assert player.is_connected() is False
+
+    await player.connect(channel, 33)
+    radio = make_track("radio", stream=True, seekable=False)
+    await player.enqueue(ResolveResult((radio,)), 33)
+    await asyncio.sleep(0.01)
+
+    assert player.is_connected() is True
+    assert (await player.snapshot()).current == radio
+    assert len(presenter.notifications) == 1
+
+
 async def test_24_7_mode_suppresses_and_restores_empty_channel_timeout() -> None:
     player, _, presenter = make_player(idle_timeout=0, stay_connected=True)
     await connect(player)
