@@ -65,6 +65,9 @@ class BaseGuildPlayer(ABC):
     async def snapshot(self) -> QueueSnapshot: ...
 
     @abstractmethod
+    async def repost_controls(self) -> None: ...
+
+    @abstractmethod
     async def handle_track_end(
         self, reason: PlaybackEndReason, backend_key: str | None
     ) -> None: ...
@@ -88,6 +91,9 @@ class BasePlayerManager(ABC):
 
     @abstractmethod
     def get(self, guild_id: int) -> BaseGuildPlayer | None: ...
+
+    @abstractmethod
+    async def repost_controls(self, guild_id: int) -> None: ...
 
     @abstractmethod
     async def handle_track_end(

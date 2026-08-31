@@ -127,6 +127,28 @@ async def test_presenter_initial_followup_and_notification() -> None:
     assert len(channel.messages) == 1
 
 
+async def test_presenter_runs_repost_handler_only_for_public_successes() -> None:
+    presenter = DefaultPresenter()
+    reposted: list[int] = []
+
+    async def repost(guild_id: int) -> None:
+        reposted.append(guild_id)
+
+    presenter.set_public_response_handler(repost)
+    interaction = SimpleNamespace(
+        guild_id=9,
+        user=SimpleNamespace(id=42),
+        response=Response(False),
+        followup=Sender(),
+    )
+
+    await presenter.respond(interaction, "Public", "Body")
+    await presenter.respond(interaction, "Private", "Body", ephemeral=True)
+    await presenter.respond(interaction, "Error", "Body", error=True)
+
+    assert reposted == [9]
+
+
 async def test_paginated_response_moves_between_pages_and_restricts_owner() -> None:
     presenter = DefaultPresenter()
     interaction = SimpleNamespace(

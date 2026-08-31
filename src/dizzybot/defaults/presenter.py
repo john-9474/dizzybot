@@ -7,7 +7,7 @@ from typing import Any
 
 import discord
 
-from dizzybot.contracts import BasePresenter
+from dizzybot.contracts import BasePresenter, PublicResponseHandler
 from dizzybot.domain import QueueSnapshot, Track
 from dizzybot.errors import InvalidRequestError
 
@@ -114,9 +114,28 @@ class DefaultPresenter(BasePresenter):
 
     def __init__(self) -> None:
         self._client: Any | None = None
+        self._public_response_handler: PublicResponseHandler | None = None
 
     def attach(self, client: Any) -> None:
         self._client = client
+
+    def set_public_response_handler(self, handler: PublicResponseHandler) -> None:
+        self._public_response_handler = handler
+
+    async def _after_public_response(
+        self,
+        interaction: Any,
+        *,
+        ephemeral: bool,
+        error: bool,
+    ) -> None:
+        guild_id = getattr(interaction, "guild_id", None)
+        if ephemeral or error or guild_id is None or self._public_response_handler is None:
+            return
+        try:
+            await self._public_response_handler(guild_id)
+        except Exception:
+            LOGGER.exception("Could not repost playback controls for guild %d", guild_id)
 
     @staticmethod
     def _embed(title: str, description: str, *, error: bool) -> discord.Embed:
@@ -134,6 +153,11 @@ class DefaultPresenter(BasePresenter):
     ) -> None:
         embed = self._embed(title, description, error=error)
         await self._send_interaction_embed(interaction, embed, ephemeral=ephemeral)
+        await self._after_public_response(
+            interaction,
+            ephemeral=ephemeral,
+            error=error,
+        )
 
     async def respond_paginated(
         self,
@@ -152,6 +176,11 @@ class DefaultPresenter(BasePresenter):
             view.current_embed(),
             ephemeral=ephemeral,
             view=view,
+        )
+        await self._after_public_response(
+            interaction,
+            ephemeral=ephemeral,
+            error=False,
         )
 
     @staticmethod
@@ -234,6 +263,7 @@ class DefaultPresenter(BasePresenter):
 
     async def respond_now_playing(self, interaction: Any, snapshot: QueueSnapshot) -> None:
         await self._send_interaction_embed(interaction, self.now_playing_embed(snapshot))
+        await self._after_public_response(interaction, ephemeral=False, error=False)
 
     async def notify(
         self,

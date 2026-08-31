@@ -222,6 +222,9 @@ playback time, requester, source, volume, repeat mode, current queue position, a
 and playlist position when applicable. The buttons use the same voice-channel and DJ/administrator
 rules as slash commands. Previous returns to the last successfully played or manually skipped track;
 failed tracks are excluded from history. Panels are disabled when playback stops or the bot leaves.
+By default, a public command response deletes and reposts the active panel so it remains the latest
+bot message in its channel. Set `bot.repost_player_controls: false` (or the corresponding advanced
+Unraid option) to keep editing the original panel in place instead.
 
 By default, DizzyBot leaves five minutes after playback becomes idle or the voice channel has no
 human listeners. Administrators can change that delay with `/settings idle-timeout`. Members with the
@@ -241,6 +244,7 @@ Environment variables beginning with `DIZZYBOT__` override nested YAML keys. For
 DIZZYBOT__BOT__DEFAULT_VOLUME=60
 DIZZYBOT__BOT__PLAYLIST_TRACK_LIMIT=200
 DIZZYBOT__BOT__RADIO_STATION_LIMIT=25
+DIZZYBOT__BOT__REPOST_PLAYER_CONTROLS=false
 DIZZYBOT__BOT__COMMAND_SYNC_GUILD_ID=123456789012345678
 DIZZYBOT__HEALTH__PORT=8081
 ```

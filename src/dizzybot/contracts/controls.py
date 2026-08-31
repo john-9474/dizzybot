@@ -19,4 +19,12 @@ class BasePlaybackControls(ABC):
     ) -> None: ...
 
     @abstractmethod
+    async def repost(
+        self,
+        guild_id: int,
+        channel_id: int,
+        snapshot: QueueSnapshot,
+    ) -> None: ...
+
+    @abstractmethod
     async def clear(self, guild_id: int) -> None: ...

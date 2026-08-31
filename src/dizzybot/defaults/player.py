@@ -287,6 +287,16 @@ class DefaultGuildPlayer(BaseGuildPlayer):
         async with self._lock:
             return self._snapshot_locked()
 
+    async def repost_controls(self) -> None:
+        async with self._lock:
+            if self._announce_channel_id is None or self._queue.current is None:
+                return
+            await self._controls.repost(
+                self.guild_id,
+                self._announce_channel_id,
+                self._snapshot_locked(),
+            )
+
     async def handle_track_end(self, reason: PlaybackEndReason, backend_key: str | None) -> None:
         async with self._lock:
             if backend_key and self._ignored_end_events[backend_key]:
@@ -500,6 +510,11 @@ class DefaultPlayerManager(BasePlayerManager):
 
     def get(self, guild_id: int) -> BaseGuildPlayer | None:
         return self._players.get(guild_id)
+
+    async def repost_controls(self, guild_id: int) -> None:
+        player = self._players.get(guild_id)
+        if player is not None:
+            await player.repost_controls()
 
     async def handle_track_end(
         self, guild_id: int, reason: PlaybackEndReason, backend_key: str | None

@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from dizzybot.domain import QueueSnapshot, Track
+
+PublicResponseHandler = Callable[[int], Awaitable[None]]
 
 
 class BasePresenter(ABC):
     @abstractmethod
     def attach(self, client: Any) -> None: ...
+
+    @abstractmethod
+    def set_public_response_handler(self, handler: PublicResponseHandler) -> None: ...
 
     @abstractmethod
     async def respond(

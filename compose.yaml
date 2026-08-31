@@ -33,6 +33,7 @@ services:
       SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
       TIDAL_TOKEN: ${TIDAL_TOKEN:-}
       DIZZYBOT__LOGGING__LEVEL: ${LOG_LEVEL:-INFO}
+      DIZZYBOT__BOT__REPOST_PLAYER_CONTROLS: ${REPOST_PLAYER_CONTROLS:-true}
     volumes:
       - bot_data:/data
     networks:

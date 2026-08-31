@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from typing import Any
 
@@ -122,12 +123,16 @@ class FakeAudioBackend(BaseAudioBackend):
 class FakePresenter(BasePresenter):
     def __init__(self) -> None:
         self.client: Any | None = None
+        self.public_response_handler: Callable[[int], Awaitable[None]] | None = None
         self.responses: list[tuple[str, str, bool, bool]] = []
         self.paginations: list[tuple[tuple[str, str], ...]] = []
         self.notifications: list[tuple[int, str, str, bool]] = []
 
     def attach(self, client: Any) -> None:
         self.client = client
+
+    def set_public_response_handler(self, handler: Callable[[int], Awaitable[None]]) -> None:
+        self.public_response_handler = handler
 
     async def respond(
         self,
@@ -181,6 +186,7 @@ class FakePlaybackControls(BasePlaybackControls):
     def __init__(self) -> None:
         self.players: dict[int, BaseGuildPlayer] = {}
         self.updates: list[tuple[int, int, QueueSnapshot]] = []
+        self.reposts: list[tuple[int, int, QueueSnapshot]] = []
         self.cleared: list[int] = []
 
     def bind_player(self, player: BaseGuildPlayer) -> None:
@@ -188,6 +194,9 @@ class FakePlaybackControls(BasePlaybackControls):
 
     async def update(self, guild_id: int, channel_id: int, snapshot: QueueSnapshot) -> None:
         self.updates.append((guild_id, channel_id, snapshot))
+
+    async def repost(self, guild_id: int, channel_id: int, snapshot: QueueSnapshot) -> None:
+        self.reposts.append((guild_id, channel_id, snapshot))
 
     async def clear(self, guild_id: int) -> None:
         self.cleared.append(guild_id)

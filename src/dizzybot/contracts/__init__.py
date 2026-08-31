@@ -6,7 +6,7 @@ from dizzybot.contracts.controls import BasePlaybackControls
 from dizzybot.contracts.health import BaseHealthService
 from dizzybot.contracts.permissions import BasePermissionPolicy
 from dizzybot.contracts.player import BaseGuildPlayer, BasePlayerManager
-from dizzybot.contracts.presenter import BasePresenter
+from dizzybot.contracts.presenter import BasePresenter, PublicResponseHandler
 from dizzybot.contracts.queue import BaseQueue
 from dizzybot.contracts.radio import BaseRadioRepository, BaseRadioResolver
 from dizzybot.contracts.resolver import BaseTrackResolver
@@ -31,4 +31,5 @@ __all__ = [
     "BaseSettingsCommands",
     "BaseSettingsRepository",
     "BaseTrackResolver",
+    "PublicResponseHandler",
 ]

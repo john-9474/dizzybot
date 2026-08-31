@@ -30,6 +30,7 @@ def test_unraid_template_deploys_one_combined_container() -> None:
     assert configs["DISCORD_TOKEN"]["Mask"] == "true"
     assert configs["TIDAL_TOKEN"]["Required"] == "false"
     assert configs["TIDAL_TOKEN"]["Mask"] == "true"
+    assert configs["DIZZYBOT__BOT__REPOST_PLAYER_CONTROLS"]["Default"] == "true"
     assert configs["/data"]["Default"] == "/mnt/user/appdata/dizzybot"
     assert "LAVALINK_PASSWORD" not in configs
     assert not any(item.attrib.get("Type") == "Port" for item in template.findall("Config"))

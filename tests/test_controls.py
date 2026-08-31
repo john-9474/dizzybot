@@ -16,9 +16,13 @@ from tests.fakes import FakeAudioBackend, FakePresenter, FakeSettingsRepository,
 class Message:
     def __init__(self) -> None:
         self.edits: list[dict[str, Any]] = []
+        self.deleted = False
 
     async def edit(self, **kwargs: Any) -> None:
         self.edits.append(kwargs)
+
+    async def delete(self) -> None:
+        self.deleted = True
 
 
 class Channel:
@@ -168,3 +172,64 @@ async def test_playback_panel_rejects_wrong_voice_channel_and_replaces_channel()
     missing.guild_id = 2
     await controls.handle(2, missing, "stop")
     assert presenter.responses[-1][0] == "Controls unavailable"
+
+
+async def test_public_response_reposts_player_controls_when_enabled() -> None:
+    text_channel = Channel(33)
+    presenter = FakePresenter()
+    settings = FakeSettingsRepository()
+    controls = DefaultPlaybackControls(
+        SimpleNamespace(get_channel=lambda _channel_id: text_channel),
+        settings,
+        DefaultPermissionPolicy(),
+        presenter,
+    )
+    players = DefaultPlayerManager(
+        FakeAudioBackend(),
+        settings,
+        presenter,
+        controls,
+        player_factory=DefaultGuildPlayer,
+        queue_factory=DefaultQueue,
+        queue_limit=10,
+    )
+    player = await players.get_or_create(1)
+    await player.connect(SimpleNamespace(id=22), 33)
+    await player.enqueue(ResolveResult((make_track("first"),)), 33)
+    old_message = text_channel.messages[0][0]
+
+    await players.repost_controls(1)
+
+    assert old_message.deleted is True
+    assert len(text_channel.messages) == 2
+    assert text_channel.messages[-1][1]["embed"]["current"] == make_track("first")
+
+
+async def test_player_control_reposting_can_be_disabled() -> None:
+    text_channel = Channel(33)
+    presenter = FakePresenter()
+    settings = FakeSettingsRepository()
+    controls = DefaultPlaybackControls(
+        SimpleNamespace(get_channel=lambda _channel_id: text_channel),
+        settings,
+        DefaultPermissionPolicy(),
+        presenter,
+        repost_player_controls=False,
+    )
+    players = DefaultPlayerManager(
+        FakeAudioBackend(),
+        settings,
+        presenter,
+        controls,
+        player_factory=DefaultGuildPlayer,
+        queue_factory=DefaultQueue,
+        queue_limit=10,
+    )
+    player = await players.get_or_create(1)
+    await player.connect(SimpleNamespace(id=22), 33)
+    await player.enqueue(ResolveResult((make_track("first"),)), 33)
+
+    await players.repost_controls(1)
+
+    assert len(text_channel.messages) == 1
+    assert text_channel.messages[0][0].deleted is False

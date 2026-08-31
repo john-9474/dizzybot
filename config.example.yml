@@ -7,6 +7,7 @@ bot:
   queue_track_limit: 500
   radio_station_limit: 50
   allow_private_radio_streams: false
+  repost_player_controls: true
   command_sync_guild_id: null
 
 lavalink:

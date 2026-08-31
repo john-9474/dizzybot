@@ -113,11 +113,14 @@ class DefaultPlaybackControls(BasePlaybackControls):
         settings: BaseSettingsRepository,
         permissions: BasePermissionPolicy,
         presenter: BasePresenter,
+        *,
+        repost_player_controls: bool = True,
     ) -> None:
         self._client = client
         self._settings = settings
         self._permissions = permissions
         self._presenter = presenter
+        self._repost_player_controls = repost_player_controls
         self._players: dict[int, BaseGuildPlayer] = {}
         self._panels: dict[int, _Panel] = {}
 
@@ -161,6 +164,29 @@ class DefaultPlaybackControls(BasePlaybackControls):
             view.stop()
             return
         self._panels[guild_id] = _Panel(channel_id, message, view)
+
+    async def repost(
+        self,
+        guild_id: int,
+        channel_id: int,
+        snapshot: QueueSnapshot,
+    ) -> None:
+        if not self._repost_player_controls or snapshot.current is None:
+            return
+        panel = self._panels.pop(guild_id, None)
+        if panel is not None:
+            panel.view.disable_all()
+            panel.view.stop()
+            try:
+                await panel.message.delete()
+            except discord.NotFound:
+                pass
+            except discord.HTTPException:
+                try:
+                    await panel.message.edit(view=panel.view)
+                except discord.HTTPException:
+                    LOGGER.debug("Could not retire old playback controls for guild %d", guild_id)
+        await self.update(guild_id, channel_id, snapshot)
 
     async def clear(self, guild_id: int) -> None:
         panel = self._panels.pop(guild_id, None)

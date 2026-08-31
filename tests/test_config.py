@@ -33,6 +33,7 @@ lavalink:
             "DIZZYBOT__BOT__DEFAULT_VOLUME": "80",
             "DIZZYBOT__BOT__STAY_CONNECTED": "true",
             "DIZZYBOT__BOT__RADIO_STATION_LIMIT": "25",
+            "DIZZYBOT__BOT__REPOST_PLAYER_CONTROLS": "false",
             "DIZZYBOT__BOT__DEFAULT_SEARCH_SOURCE": "soundcloud",
         },
     )
@@ -42,6 +43,7 @@ lavalink:
     assert config.bot.default_volume == 80
     assert config.bot.stay_connected is True
     assert config.bot.radio_station_limit == 25
+    assert config.bot.repost_player_controls is False
     assert config.bot.default_search_source is Source.SOUNDCLOUD
     assert config.spotify.configured is True
     assert config.tidal.configured is True
@@ -56,6 +58,7 @@ def test_spotify_requires_both_credentials(tmp_path: Path) -> None:
     config = load_config(config_file, environment={"SPOTIFY_CLIENT_ID": "spotify-id"})
 
     assert config.spotify.configured is False
+    assert config.bot.repost_player_controls is True
 
 
 def test_tidal_requires_non_empty_token(tmp_path: Path) -> None:

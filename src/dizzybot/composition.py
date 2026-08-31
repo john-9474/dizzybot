@@ -73,7 +73,13 @@ def build_services(config: AppConfig) -> ServiceContainer:
     radios = DefaultRadioRepository(config.database.url)
     presenter = DefaultPresenter()
     permissions = DefaultPermissionPolicy()
-    controls = DefaultPlaybackControls(bot, settings, permissions, presenter)
+    controls = DefaultPlaybackControls(
+        bot,
+        settings,
+        permissions,
+        presenter,
+        repost_player_controls=config.bot.repost_player_controls,
+    )
     available_sources = {
         Source.YOUTUBE,
         Source.SOUNDCLOUD,
@@ -98,6 +104,7 @@ def build_services(config: AppConfig) -> ServiceContainer:
         queue_factory=DefaultQueue,
         queue_limit=config.bot.queue_track_limit,
     )
+    presenter.set_public_response_handler(players.repost_controls)
     music_commands = DefaultMusicCommands(
         resolver, players, settings, permissions, presenter, config.bot
     )

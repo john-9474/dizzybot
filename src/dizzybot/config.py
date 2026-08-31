@@ -24,6 +24,7 @@ class BotConfig(BaseModel):
     queue_track_limit: int = Field(default=500, ge=1, le=500)
     radio_station_limit: int = Field(default=50, ge=1, le=100)
     allow_private_radio_streams: bool = False
+    repost_player_controls: bool = True
     command_sync_guild_id: int | None = None
 
     @field_validator("default_search_source")
