@@ -17,7 +17,7 @@ jobs:
         with:
           version: "0.12.7"
           enable-cache: true
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
       - run: uv sync --frozen --extra dev
