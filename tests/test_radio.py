@@ -214,13 +214,57 @@ async def test_radio_commands_add_list_play_and_remove() -> None:
         "House Nation",
         "https://streaming.radio.co/s06bd9d805/listen",
     )
-    await callback(cog.list_stations, cog, command_interaction, 1)
+    await callback(cog.list_stations, cog, command_interaction)
+    assert presenter.paginations[0][0][0] == "Radio stations — page 1/1"
+    await callback(cog.play_random, cog, command_interaction)
+    assert presenter.responses[-1][0] == "Random radio queued"
     await callback(cog.play, cog, command_interaction, "house nation")
     assert audio.connected == {1: 22}
     assert audio.played[-1][1].source is Source.RADIO
     assert audio.played[-1][1].is_stream is True
     await callback(cog.remove, cog, command_interaction, "House Nation")
     assert await repository.list(1) == ()
+
+
+async def test_radio_list_builds_pages_and_random_requires_a_station() -> None:
+    repository = FakeRadioRepository()
+    settings = FakeSettingsRepository()
+    presenter = FakePresenter()
+    players = DefaultPlayerManager(
+        FakeAudioBackend(),
+        settings,
+        presenter,
+        FakePlaybackControls(),
+        player_factory=DefaultGuildPlayer,
+        queue_factory=DefaultQueue,
+        queue_limit=20,
+    )
+    cog = DefaultRadioCommands(
+        FakeRadioResolver(),
+        repository,
+        players,
+        settings,
+        DefaultPermissionPolicy(),
+        presenter,
+        station_limit=20,
+    )
+    command_interaction = interaction(administrator=False)
+
+    with pytest.raises(InvalidRequestError, match="No radio stations"):
+        await callback(cog.play_random, cog, command_interaction)
+
+    for index in range(12):
+        await repository.add(
+            RadioStation(1, f"Station {index + 1:02d}", f"https://radio/{index + 1}")
+        )
+    await callback(cog.list_stations, cog, command_interaction)
+
+    pages = presenter.paginations[-1]
+    assert len(pages) == 2
+    assert pages[0][0] == "Radio stations — page 1/2"
+    assert "`10.`" in pages[0][1]
+    assert pages[1][0] == "Radio stations — page 2/2"
+    assert "`11.`" in pages[1][1]
 
 
 async def test_radio_management_requires_dj_or_administrator() -> None:

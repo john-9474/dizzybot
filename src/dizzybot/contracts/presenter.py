@@ -22,6 +22,15 @@ class BasePresenter(ABC):
     ) -> None: ...
 
     @abstractmethod
+    async def respond_paginated(
+        self,
+        interaction: Any,
+        pages: tuple[tuple[str, str], ...],
+        *,
+        ephemeral: bool = False,
+    ) -> None: ...
+
+    @abstractmethod
     async def notify(
         self,
         channel_id: int,

@@ -8,7 +8,7 @@ from typing import Any
 import discord
 import pytest
 
-from dizzybot.defaults.presenter import DefaultPresenter, format_duration
+from dizzybot.defaults.presenter import DefaultPresenter, PaginationView, format_duration
 from dizzybot.domain import QueueSnapshot, RepeatMode
 from dizzybot.errors import InvalidRequestError
 from tests.fakes import make_track
@@ -33,12 +33,23 @@ class Response(Sender):
     async def send_message(self, **kwargs: Any) -> None:
         await self.send(**kwargs)
 
+    async def edit_message(self, **kwargs: Any) -> None:
+        await self.send(**kwargs)
+
 
 class ExpiredResponse(Response):
     async def send_message(self, **kwargs: Any) -> None:
         del kwargs
         response = SimpleNamespace(status=404, reason="Not Found")
         raise discord.NotFound(response, {"code": 10062, "message": "Unknown interaction"})
+
+
+def pagination_button(view: PaginationView, custom_id: str) -> discord.ui.Button[Any]:
+    return next(
+        item
+        for item in view.children
+        if isinstance(item, discord.ui.Button) and item.custom_id == custom_id
+    )
 
 
 def test_duration_and_queue_pages() -> None:
@@ -114,6 +125,47 @@ async def test_presenter_initial_followup_and_notification() -> None:
     await presenter.notify(1, "Notice", "Body")
     await presenter.notify(2, "Ignored", "Body")
     assert len(channel.messages) == 1
+
+
+async def test_paginated_response_moves_between_pages_and_restricts_owner() -> None:
+    presenter = DefaultPresenter()
+    interaction = SimpleNamespace(
+        user=SimpleNamespace(id=42),
+        response=Response(False),
+        followup=Sender(),
+    )
+    await presenter.respond_paginated(
+        interaction,
+        (("Page 1/2", "First"), ("Page 2/2", "Second")),
+    )
+
+    sent = interaction.response.messages[0]
+    view = sent["view"]
+    assert isinstance(view, PaginationView)
+    assert sent["embed"].title == "Page 1/2"
+    previous = pagination_button(view, "dizzybot:page-previous")
+    next_page = pagination_button(view, "dizzybot:page-next")
+    assert previous.disabled is True
+    assert next_page.disabled is False
+
+    page_interaction = SimpleNamespace(
+        user=SimpleNamespace(id=42),
+        response=Response(False),
+        followup=Sender(),
+    )
+    await next_page.callback(page_interaction)
+    assert view.page == 2
+    assert page_interaction.response.messages[0]["embed"].title == "Page 2/2"
+    assert previous.disabled is False
+    assert next_page.disabled is True
+
+    outsider = SimpleNamespace(
+        user=SimpleNamespace(id=7),
+        response=Response(False),
+        followup=Sender(),
+    )
+    assert await view.interaction_check(outsider) is False
+    assert outsider.response.messages[0]["ephemeral"] is True
 
 
 async def test_presenter_handles_expired_interaction_without_secondary_error(

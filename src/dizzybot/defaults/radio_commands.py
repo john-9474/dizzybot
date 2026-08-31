@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import math
+import random
 from typing import Any
 
 import discord
@@ -114,6 +114,16 @@ class DefaultRadioCommands(
         station = await self._repository.get(guild_id, name)
         if station is None:
             raise InvalidRequestError(f'No saved radio station is named "{name}".')
+        await self._queue_station(interaction, station)
+
+    async def _queue_station(
+        self,
+        interaction: discord.Interaction[Any],
+        station: RadioStation,
+        *,
+        response_title: str = "Radio queued",
+    ) -> None:
+        guild_id = self._guild_id(interaction)
         settings = await self._settings.get(guild_id)
         player = await self._players.get_or_create(guild_id)
         channel = self._permissions.voice_channel_for(
@@ -127,8 +137,22 @@ class DefaultRadioCommands(
         await player.enqueue(result, self._channel_id(interaction))
         await self.presenter.respond(
             interaction,
-            "Radio queued",
+            response_title,
             f"Added {self.presenter.track_description(result.tracks[0])}.",
+        )
+
+    @app_commands.command(name="playrandom", description="Play or queue a random saved station")
+    async def play_random(self, interaction: discord.Interaction[Any]) -> None:
+        await interaction.response.defer(thinking=True)
+        stations = await self._repository.list(self._guild_id(interaction))
+        if not stations:
+            raise InvalidRequestError(
+                "No radio stations are saved. A DJ or administrator can use `/radio add`."
+            )
+        await self._queue_station(
+            interaction,
+            random.choice(stations),
+            response_title="Random radio queued",
         )
 
     @play.autocomplete("name")
@@ -138,26 +162,30 @@ class DefaultRadioCommands(
         return await self._autocomplete(interaction, current)
 
     @app_commands.command(name="list", description="List this server's saved radio stations")
-    async def list_stations(self, interaction: discord.Interaction[Any], page: int = 1) -> None:
+    async def list_stations(self, interaction: discord.Interaction[Any]) -> None:
         stations = await self._repository.list(self._guild_id(interaction))
-        pages = max(1, math.ceil(len(stations) / self.PAGE_SIZE))
-        if page < 1 or page > pages:
-            raise InvalidRequestError(f"Page must be between 1 and {pages}.")
-        start = (page - 1) * self.PAGE_SIZE
-        selected = stations[start : start + self.PAGE_SIZE]
-        if selected:
-            lines = [
-                f"`{start + index + 1}.` **{discord.utils.escape_markdown(station.name)}** — "
-                f"<{station.url}>"
-                for index, station in enumerate(selected)
-            ]
+        if stations:
+            page_count = (len(stations) + self.PAGE_SIZE - 1) // self.PAGE_SIZE
+            pages = tuple(
+                (
+                    f"Radio stations — page {page + 1}/{page_count}",
+                    "\n".join(
+                        f"`{start + index + 1}.` "
+                        f"**{discord.utils.escape_markdown(station.name)}** — <{station.url}>"
+                        for index, station in enumerate(stations[start : start + self.PAGE_SIZE])
+                    ),
+                )
+                for page in range(page_count)
+                for start in (page * self.PAGE_SIZE,)
+            )
         else:
-            lines = ["No radio stations are saved. A DJ or administrator can use `/radio add`."]
-        await self.presenter.respond(
-            interaction,
-            f"Radio stations — page {page}/{pages}",
-            "\n".join(lines),
-        )
+            pages = (
+                (
+                    "Radio stations",
+                    "No radio stations are saved. A DJ or administrator can use `/radio add`.",
+                ),
+            )
+        await self.presenter.respond_paginated(interaction, pages)
 
     @app_commands.command(name="remove", description="Remove a saved station (DJ/admin only)")
     @app_commands.describe(name="Saved station name")

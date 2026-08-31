@@ -123,6 +123,7 @@ class FakePresenter(BasePresenter):
     def __init__(self) -> None:
         self.client: Any | None = None
         self.responses: list[tuple[str, str, bool, bool]] = []
+        self.paginations: list[tuple[tuple[str, str], ...]] = []
         self.notifications: list[tuple[int, str, str, bool]] = []
 
     def attach(self, client: Any) -> None:
@@ -139,6 +140,16 @@ class FakePresenter(BasePresenter):
     ) -> None:
         del interaction
         self.responses.append((title, description, error, ephemeral))
+
+    async def respond_paginated(
+        self,
+        interaction: Any,
+        pages: tuple[tuple[str, str], ...],
+        *,
+        ephemeral: bool = False,
+    ) -> None:
+        del interaction, ephemeral
+        self.paginations.append(pages)
 
     async def notify(
         self,

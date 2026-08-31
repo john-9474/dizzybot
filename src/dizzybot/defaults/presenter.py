@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import math
+from collections.abc import Callable
 from typing import Any
 
 import discord
@@ -11,6 +12,8 @@ from dizzybot.domain import QueueSnapshot, Track
 from dizzybot.errors import InvalidRequestError
 
 LOGGER = logging.getLogger(__name__)
+Page = tuple[str, str]
+EmbedFactory = Callable[[str, str], discord.Embed]
 
 
 def format_duration(milliseconds: int | None) -> str:
@@ -20,6 +23,90 @@ def format_duration(milliseconds: int | None) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes}:{seconds:02d}"
+
+
+class PaginationView(discord.ui.View):
+    def __init__(
+        self,
+        pages: tuple[Page, ...],
+        *,
+        owner_id: int,
+        embed_factory: EmbedFactory,
+    ) -> None:
+        if not pages:
+            raise ValueError("A paginator requires at least one page")
+        super().__init__(timeout=180)
+        self._pages = pages
+        self._owner_id = owner_id
+        self._embed_factory = embed_factory
+        self._page = 0
+        self.message: Any | None = None
+        self._sync_buttons()
+
+    @property
+    def page(self) -> int:
+        return self._page + 1
+
+    def current_embed(self) -> discord.Embed:
+        title, description = self._pages[self._page]
+        return self._embed_factory(title, description)
+
+    def _sync_buttons(self) -> None:
+        for item in self.children:
+            if not isinstance(item, discord.ui.Button):
+                continue
+            if item.custom_id == "dizzybot:page-previous":
+                item.disabled = self._page == 0
+            elif item.custom_id == "dizzybot:page-next":
+                item.disabled = self._page == len(self._pages) - 1
+
+    async def interaction_check(self, interaction: discord.Interaction[Any]) -> bool:
+        if interaction.user.id == self._owner_id:
+            return True
+        embed = self._embed_factory(
+            "Paginator unavailable",
+            "Only the person who opened this list can change its page.",
+        )
+        if interaction.response.is_done():
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        else:
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        return False
+
+    @discord.ui.button(
+        label="Previous",
+        style=discord.ButtonStyle.secondary,
+        custom_id="dizzybot:page-previous",
+    )
+    async def previous(
+        self, interaction: discord.Interaction[Any], _button: discord.ui.Button[Any]
+    ) -> None:
+        self._page = max(0, self._page - 1)
+        self._sync_buttons()
+        await interaction.response.edit_message(embed=self.current_embed(), view=self)
+
+    @discord.ui.button(
+        label="Next",
+        style=discord.ButtonStyle.secondary,
+        custom_id="dizzybot:page-next",
+    )
+    async def next_page(
+        self, interaction: discord.Interaction[Any], _button: discord.ui.Button[Any]
+    ) -> None:
+        self._page = min(len(self._pages) - 1, self._page + 1)
+        self._sync_buttons()
+        await interaction.response.edit_message(embed=self.current_embed(), view=self)
+
+    async def on_timeout(self) -> None:
+        for item in self.children:
+            if isinstance(item, discord.ui.Button):
+                item.disabled = True
+        if self.message is None:
+            return
+        try:
+            await self.message.edit(view=self)
+        except discord.HTTPException:
+            LOGGER.debug("Could not disable an expired paginator")
 
 
 class DefaultPresenter(BasePresenter):
@@ -48,22 +135,55 @@ class DefaultPresenter(BasePresenter):
         embed = self._embed(title, description, error=error)
         await self._send_interaction_embed(interaction, embed, ephemeral=ephemeral)
 
+    async def respond_paginated(
+        self,
+        interaction: Any,
+        pages: tuple[Page, ...],
+        *,
+        ephemeral: bool = False,
+    ) -> None:
+        view = PaginationView(
+            pages,
+            owner_id=interaction.user.id,
+            embed_factory=lambda title, description: self._embed(title, description, error=False),
+        )
+        view.message = await self._send_interaction_embed(
+            interaction,
+            view.current_embed(),
+            ephemeral=ephemeral,
+            view=view,
+        )
+
     @staticmethod
     async def _send_interaction_embed(
         interaction: Any,
         embed: discord.Embed,
         *,
         ephemeral: bool = False,
-    ) -> None:
+        view: discord.ui.View | None = None,
+    ) -> Any | None:
         try:
             if interaction.response.is_done():
-                await interaction.followup.send(embed=embed, ephemeral=ephemeral)
-            else:
-                await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
+                options: dict[str, Any] = {
+                    "embed": embed,
+                    "ephemeral": ephemeral,
+                    "view": view,
+                }
+                if view is not None:
+                    options["wait"] = True
+                return await interaction.followup.send(**options)
+            await interaction.response.send_message(
+                embed=embed,
+                ephemeral=ephemeral,
+                view=view,
+            )
+            if view is not None and hasattr(interaction, "original_response"):
+                return await interaction.original_response()
         except discord.NotFound as send_error:
             if send_error.code != 10062:
                 raise
             LOGGER.warning("Discord interaction expired before a response could be sent")
+        return None
 
     def now_playing_embed(self, snapshot: QueueSnapshot) -> discord.Embed:
         track = snapshot.current

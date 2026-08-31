@@ -201,7 +201,8 @@ reloads its media URL and attempts to reconnect up to three times before continu
 | `/seek position` | Seek using seconds, `MM:SS`, or `HH:MM:SS` |
 | `/radio add name url` | Save a direct stream URL (DJ role or administrator) |
 | `/radio play name` | Play or queue a saved station; station names autocomplete |
-| `/radio list [page]` | List this server's saved stations |
+| `/radio playrandom` | Play or queue a randomly selected saved station |
+| `/radio list` | List saved stations with Previous and Next page buttons |
 | `/radio remove name` | Remove a saved station (DJ role or administrator) |
 | `/settings show` | Display persistent settings (Manage Server required) |
 | `/settings volume` | Change the default volume |
