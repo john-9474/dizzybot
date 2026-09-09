@@ -10,6 +10,7 @@ from dizzybot.contracts import (
     BaseGuildPlayer,
     BasePlaybackControls,
     BasePresenter,
+    BaseRadioMetadataProvider,
     BaseSettingsRepository,
 )
 from dizzybot.domain import (
@@ -17,6 +18,7 @@ from dizzybot.domain import (
     GuildSettings,
     PlaybackEndReason,
     QueueSnapshot,
+    RadioMetadata,
     Source,
     Track,
 )
@@ -118,6 +120,16 @@ class FakeAudioBackend(BaseAudioBackend):
     ) -> None:
         assert self.handler is not None
         await self.handler(guild_id, reason, backend_key)
+
+
+class FakeRadioMetadataProvider(BaseRadioMetadataProvider):
+    def __init__(self, metadata: RadioMetadata | None = None) -> None:
+        self.metadata = metadata
+        self.urls: list[str] = []
+
+    async def fetch(self, url: str) -> RadioMetadata | None:
+        self.urls.append(url)
+        return self.metadata
 
 
 class FakePresenter(BasePresenter):

@@ -8,7 +8,11 @@ from dizzybot.contracts.permissions import BasePermissionPolicy
 from dizzybot.contracts.player import BaseGuildPlayer, BasePlayerManager
 from dizzybot.contracts.presenter import BasePresenter, PublicResponseHandler
 from dizzybot.contracts.queue import BaseQueue
-from dizzybot.contracts.radio import BaseRadioRepository, BaseRadioResolver
+from dizzybot.contracts.radio import (
+    BaseRadioMetadataProvider,
+    BaseRadioRepository,
+    BaseRadioResolver,
+)
 from dizzybot.contracts.resolver import BaseTrackResolver
 from dizzybot.contracts.runtime import BaseBotRuntime
 from dizzybot.contracts.settings import BaseSettingsRepository
@@ -26,6 +30,7 @@ __all__ = [
     "BasePresenter",
     "BaseQueue",
     "BaseRadioCommands",
+    "BaseRadioMetadataProvider",
     "BaseRadioRepository",
     "BaseRadioResolver",
     "BaseSettingsCommands",

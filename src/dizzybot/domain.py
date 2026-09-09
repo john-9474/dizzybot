@@ -112,6 +112,12 @@ class RadioStation:
 
 
 @dataclass(frozen=True, slots=True)
+class RadioMetadata:
+    station_name: str | None = None
+    now_playing: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class QueueSnapshot:
     current: Track | None
     upcoming: tuple[Track, ...]
@@ -122,6 +128,7 @@ class QueueSnapshot:
     queue_position: int | None = None
     queue_total: int = 0
     can_go_previous: bool = False
+    radio_metadata: RadioMetadata | None = None
 
 
 @dataclass(frozen=True, slots=True)

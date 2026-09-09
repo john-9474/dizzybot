@@ -238,6 +238,13 @@ class DefaultPresenter(BasePresenter):
             )
         embed.add_field(name="Playback", value=playback, inline=True)
 
+        metadata = snapshot.radio_metadata
+        if metadata is not None and metadata.now_playing:
+            on_air = discord.utils.escape_markdown(
+                discord.utils.escape_mentions(metadata.now_playing)
+            )
+            embed.add_field(name="On air", value=on_air, inline=False)
+
         if snapshot.queue_position is not None and snapshot.queue_total:
             queue_position = f"{snapshot.queue_position} of {snapshot.queue_total}"
         else:

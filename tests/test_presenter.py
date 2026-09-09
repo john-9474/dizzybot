@@ -9,7 +9,7 @@ import discord
 import pytest
 
 from dizzybot.defaults.presenter import DefaultPresenter, PaginationView, format_duration
-from dizzybot.domain import QueueSnapshot, RepeatMode
+from dizzybot.domain import QueueSnapshot, RadioMetadata, RepeatMode, Source
 from dizzybot.errors import InvalidRequestError
 from tests.fakes import make_track
 
@@ -101,11 +101,22 @@ def test_now_playing_embed_includes_playlist_queue_and_playback_details() -> Non
 
 def test_now_playing_embed_handles_paused_live_stream() -> None:
     presenter = DefaultPresenter()
-    snapshot = QueueSnapshot(make_track(stream=True), (), RepeatMode.OFF, 75, True)
+    snapshot = QueueSnapshot(
+        make_track(stream=True, source=Source.RADIO),
+        (),
+        RepeatMode.OFF,
+        75,
+        True,
+        radio_metadata=RadioMetadata(
+            station_name="Test FM",
+            now_playing="Artist @everyone - **Track**",
+        ),
+    )
     embed = presenter.now_playing_embed(snapshot)
     fields = {field.name: field.value for field in embed.fields}
     assert embed.title == "Paused"
     assert fields["Playback"] == "Live stream"
+    assert fields["On air"] == "Artist @\u200beveryone - \\*\\*Track\\*\\*"
     assert fields["Queue position"] == "Not available"
 
 

@@ -14,12 +14,14 @@ from dizzybot.contracts import (
     BasePlayerManager,
     BasePresenter,
     BaseQueue,
+    BaseRadioMetadataProvider,
     BaseSettingsRepository,
 )
 from dizzybot.domain import (
     GuildSettings,
     PlaybackEndReason,
     QueueSnapshot,
+    RadioMetadata,
     RepeatMode,
     ResolveResult,
     Source,
@@ -45,7 +47,11 @@ class DefaultGuildPlayer(BaseGuildPlayer):
         settings: GuildSettings,
         *,
         queue_limit: int,
+        radio_metadata: BaseRadioMetadataProvider | None = None,
+        radio_metadata_poll_interval_seconds: float = 30.0,
     ) -> None:
+        if radio_metadata_poll_interval_seconds <= 0:
+            raise ValueError("radio_metadata_poll_interval_seconds must be positive")
         self.guild_id = guild_id
         self._backend = backend
         self._queue = queue
@@ -53,6 +59,8 @@ class DefaultGuildPlayer(BaseGuildPlayer):
         self._controls = controls
         self._settings = settings
         self._queue_limit = queue_limit
+        self._radio_metadata_provider = radio_metadata
+        self._radio_metadata_poll_interval_seconds = radio_metadata_poll_interval_seconds
         self._volume = settings.default_volume
         self._announce_channel_id: int | None = None
         self._has_humans = True
@@ -60,6 +68,8 @@ class DefaultGuildPlayer(BaseGuildPlayer):
         self._ignored_end_events: Counter[str] = Counter()
         self._radio_retry_key: str | None = None
         self._radio_retry_attempts = 0
+        self._radio_metadata: RadioMetadata | None = None
+        self._radio_metadata_task: asyncio.Task[None] | None = None
         self._lock = asyncio.Lock()
 
     async def connect(self, channel: Any, announce_channel_id: int) -> None:
@@ -99,6 +109,9 @@ class DefaultGuildPlayer(BaseGuildPlayer):
             return len(result.tracks)
 
     async def _play_next_locked(self) -> None:
+        starting_track = self._queue.current is None
+        if starting_track:
+            self._cancel_radio_metadata_locked()
         while self._queue.current is None:
             track = self._queue.take_next()
             if track is None:
@@ -124,6 +137,8 @@ class DefaultGuildPlayer(BaseGuildPlayer):
                 continue
         self._refresh_idle_timer_locked()
         await self._update_controls_locked()
+        if starting_track:
+            self._start_radio_metadata_locked()
 
     def _snapshot_locked(self) -> QueueSnapshot:
         return QueueSnapshot(
@@ -136,6 +151,7 @@ class DefaultGuildPlayer(BaseGuildPlayer):
             queue_position=self._queue.current_position,
             queue_total=self._queue.total_size,
             can_go_previous=self._queue.can_go_previous,
+            radio_metadata=self._radio_metadata,
         )
 
     async def _update_controls_locked(self) -> None:
@@ -156,9 +172,55 @@ class DefaultGuildPlayer(BaseGuildPlayer):
     def _track_retry_key(track: Track) -> str:
         return track.backend_key or f"{track.source.value}:{track.identifier}"
 
+    def _cancel_radio_metadata_locked(self) -> None:
+        task = self._radio_metadata_task
+        if task is not None and task is not asyncio.current_task() and not task.done():
+            task.cancel()
+        self._radio_metadata_task = None
+        self._radio_metadata = None
+
+    def _start_radio_metadata_locked(self) -> None:
+        track = self._queue.current
+        if (
+            self._radio_metadata_provider is None
+            or track is None
+            or track.source is not Source.RADIO
+        ):
+            return
+        track_key = self._track_retry_key(track)
+        self._radio_metadata_task = asyncio.create_task(
+            self._poll_radio_metadata(track_key, track.uri),
+            name=f"dizzybot-radio-metadata-{self.guild_id}",
+        )
+
+    async def _poll_radio_metadata(self, track_key: str, url: str) -> None:
+        assert self._radio_metadata_provider is not None
+        while True:
+            try:
+                metadata = await self._radio_metadata_provider.fetch(url)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                LOGGER.debug(
+                    "Radio metadata provider failed in guild %d",
+                    self.guild_id,
+                    exc_info=True,
+                )
+                metadata = None
+
+            async with self._lock:
+                current = self._queue.current
+                if current is None or self._track_retry_key(current) != track_key:
+                    return
+                if metadata is not None and metadata != self._radio_metadata:
+                    self._radio_metadata = metadata
+                    await self._update_controls_locked()
+            await asyncio.sleep(self._radio_metadata_poll_interval_seconds)
+
     async def leave(self) -> None:
         async with self._lock:
             self._cancel_idle_timer_locked()
+            self._cancel_radio_metadata_locked()
             self._ignore_current_end_locked()
             self._queue.reset()
             if self._backend.is_connected(self.guild_id):
@@ -201,6 +263,7 @@ class DefaultGuildPlayer(BaseGuildPlayer):
         async with self._lock:
             interrupted = self._require_current()
             track = self._queue.take_previous()
+            self._cancel_radio_metadata_locked()
             self._radio_retry_key = self._track_retry_key(track)
             self._radio_retry_attempts = 0
             if interrupted.backend_key:
@@ -220,11 +283,13 @@ class DefaultGuildPlayer(BaseGuildPlayer):
                 await self._play_next_locked()
             else:
                 await self._update_controls_locked()
+                self._start_radio_metadata_locked()
             return track
 
     async def stop(self) -> None:
         async with self._lock:
             self._require_current()
+            self._cancel_radio_metadata_locked()
             self._ignore_current_end_locked()
             self._queue.stop()
             await self._backend.stop(self.guild_id)
@@ -443,6 +508,7 @@ class DefaultGuildPlayer(BaseGuildPlayer):
                     reason,
                 )
                 self._ignore_current_end_locked()
+                self._cancel_radio_metadata_locked()
                 self._queue.reset()
                 await self._backend.disconnect(self.guild_id)
                 self._idle_task = None
@@ -475,6 +541,7 @@ class DefaultPlayerManager(BasePlayerManager):
         player_factory: GuildPlayerFactory,
         queue_factory: QueueFactory,
         queue_limit: int,
+        radio_metadata: BaseRadioMetadataProvider | None = None,
     ) -> None:
         self._backend = backend
         self._settings = settings
@@ -483,6 +550,7 @@ class DefaultPlayerManager(BasePlayerManager):
         self._player_factory = player_factory
         self._queue_factory = queue_factory
         self._queue_limit = queue_limit
+        self._radio_metadata = radio_metadata
         self._players: dict[int, BaseGuildPlayer] = {}
         self._lock = asyncio.Lock()
         backend.set_event_handler(self.handle_track_end)
@@ -503,6 +571,7 @@ class DefaultPlayerManager(BasePlayerManager):
                     self._controls,
                     guild_settings,
                     queue_limit=self._queue_limit,
+                    radio_metadata=self._radio_metadata,
                 )
                 self._players[guild_id] = player
                 self._controls.bind_player(player)

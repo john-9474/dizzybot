@@ -10,6 +10,7 @@ from dizzybot.defaults.queue import DefaultQueue
 from dizzybot.domain import (
     GuildSettings,
     PlaybackEndReason,
+    RadioMetadata,
     RepeatMode,
     ResolveResult,
     Source,
@@ -19,6 +20,7 @@ from tests.fakes import (
     FakeAudioBackend,
     FakePlaybackControls,
     FakePresenter,
+    FakeRadioMetadataProvider,
     FakeSettingsRepository,
     make_track,
 )
@@ -148,6 +150,71 @@ async def test_failed_radio_reconnects_before_advancing_queue() -> None:
     assert snapshot.upcoming == (following,)
     assert [call[1] for call in audio.played] == [radio, radio]
     assert presenter.notifications[-1][1] == "Radio reconnected"
+
+
+async def test_radio_metadata_updates_controls_and_clears_for_next_track() -> None:
+    audio = FakeAudioBackend()
+    controls = FakePlaybackControls()
+    first_metadata = RadioMetadata(station_name="Test FM", now_playing="Artist - First")
+    second_metadata = RadioMetadata(station_name="Test FM", now_playing="Artist - Second")
+
+    class ChangingMetadataProvider(FakeRadioMetadataProvider):
+        def __init__(self) -> None:
+            super().__init__(first_metadata)
+            self.second_started = asyncio.Event()
+            self.release_second = asyncio.Event()
+
+        async def fetch(self, url: str) -> RadioMetadata | None:
+            self.urls.append(url)
+            if len(self.urls) == 1:
+                return first_metadata
+            if len(self.urls) == 2:
+                self.second_started.set()
+                await self.release_second.wait()
+                return second_metadata
+            await asyncio.Event().wait()
+            return None
+
+    metadata_provider = ChangingMetadataProvider()
+    player = DefaultGuildPlayer(
+        1,
+        audio,
+        DefaultQueue(),
+        FakePresenter(),
+        controls,
+        GuildSettings(guild_id=1),
+        queue_limit=10,
+        radio_metadata=metadata_provider,
+        radio_metadata_poll_interval_seconds=0.001,
+    )
+    await connect(player)
+    radio = make_track("radio", source=Source.RADIO, stream=True, seekable=False)
+    following = make_track("following")
+    await player.enqueue(ResolveResult((radio, following)), 33)
+
+    for _ in range(10):
+        if (await player.snapshot()).radio_metadata is not None:
+            break
+        await asyncio.sleep(0)
+
+    snapshot = await player.snapshot()
+    assert snapshot.radio_metadata == first_metadata
+    assert controls.updates[-1][2].radio_metadata == first_metadata
+
+    await asyncio.wait_for(metadata_provider.second_started.wait(), timeout=1)
+    metadata_provider.release_second.set()
+    for _ in range(10):
+        if (await player.snapshot()).radio_metadata == second_metadata:
+            break
+        await asyncio.sleep(0)
+    assert (await player.snapshot()).radio_metadata == second_metadata
+    assert all(url == radio.uri for url in metadata_provider.urls)
+
+    await player.skip()
+    snapshot = await player.snapshot()
+    assert snapshot.current == following
+    assert snapshot.radio_metadata is None
+    await player.stop()
 
 
 async def test_radio_advances_after_reconnect_limit_is_exhausted() -> None:

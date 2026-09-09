@@ -10,6 +10,7 @@ from dizzybot.defaults.presenter import DefaultPresenter
 from dizzybot.defaults.queue import DefaultQueue
 from dizzybot.defaults.radio import DefaultRadioResolver
 from dizzybot.defaults.radio_commands import DefaultRadioCommands
+from dizzybot.defaults.radio_metadata import DefaultIcyMetadataProvider
 from dizzybot.defaults.radio_repository import DefaultRadioRepository
 from dizzybot.defaults.resolver import DefaultTrackResolver
 from dizzybot.defaults.settings import DefaultSettingsRepository
@@ -18,6 +19,7 @@ __all__ = [
     "DefaultAudioBackend",
     "DefaultGuildPlayer",
     "DefaultHealthService",
+    "DefaultIcyMetadataProvider",
     "DefaultMusicCommands",
     "DefaultPermissionPolicy",
     "DefaultPlaybackControls",

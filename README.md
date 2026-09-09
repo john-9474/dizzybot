@@ -19,6 +19,7 @@ implementations.
 - Optional TIDAL tracks, albums, and playlists mirrored to YouTube or SoundCloud
 - Bandcamp tracks and albums
 - Persistent per-server internet radio stations, with no stations imposed by default
+- Live ICY radio metadata in the playback panel when a station publishes it
 - Slash commands only; no message-content intent
 - Independent queues and playback in multiple Discord servers
 - Pause, resume, seek, volume, queue editing, shuffle, and track/queue repeat
@@ -188,6 +189,10 @@ Both modern HTTPS streams and older HTTP Icecast/SHOUTcast streams are supported
 audio endpoint—usually returning a content type such as `audio/mpeg`—rather than a station's web
 player page. Plain HTTP works for legacy stations but is not encrypted in transit.
 
+For Icecast and SHOUTcast streams that publish ICY `StreamTitle` metadata, the playback panel adds
+an **On air** field and refreshes it when the station changes its current track or programme. Radio
+metadata is optional: streams that omit it continue playing with the normal station-only panel.
+
 Adding and removing stations requires an administrator or the configured DJ role. This is important
 because the saved URL causes the self-hosted audio service to make an outbound connection. URLs with
 embedded credentials and URLs resolving to local, private, link-local, or reserved addresses are
@@ -328,7 +333,8 @@ players = DefaultPlayerManager(
 
 The same pattern applies to `BaseAudioBackend`, `BaseTrackResolver`, `BaseGuildPlayer`,
 `BasePermissionPolicy`, `BaseSettingsRepository`, `BasePresenter`, command bases, the health service,
-`BasePlaybackControls`, `BaseRadioRepository`, `BaseRadioResolver`, and runtime. There is
+`BasePlaybackControls`, `BaseRadioRepository`, `BaseRadioResolver`,
+`BaseRadioMetadataProvider`, and runtime. There is
 intentionally no dynamic plugin loader or import-path configuration.
 
 ## Development

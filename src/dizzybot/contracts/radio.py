@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from dizzybot.domain import RadioStation, ResolveResult
+from dizzybot.domain import RadioMetadata, RadioStation, ResolveResult
 
 
 class BaseRadioRepository(ABC):
@@ -34,3 +34,8 @@ class BaseRadioResolver(ABC):
 
     @abstractmethod
     async def resolve(self, station: RadioStation, requester_id: int) -> ResolveResult: ...
+
+
+class BaseRadioMetadataProvider(ABC):
+    @abstractmethod
+    async def fetch(self, url: str) -> RadioMetadata | None: ...

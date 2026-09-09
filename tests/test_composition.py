@@ -22,6 +22,7 @@ def test_composition_builds_default_contracts() -> None:
     assert services.controls is not None
     assert services.radios.is_ready() is False
     assert services.radio_resolver is not None
+    assert services.radio_metadata is not None
     assert services.radio_commands is not None
     assert services.runtime is not None
 

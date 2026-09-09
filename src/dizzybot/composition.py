@@ -19,6 +19,7 @@ from dizzybot.contracts import (
     BasePlayerManager,
     BasePresenter,
     BaseRadioCommands,
+    BaseRadioMetadataProvider,
     BaseRadioRepository,
     BaseRadioResolver,
     BaseSettingsCommands,
@@ -35,6 +36,7 @@ from dizzybot.defaults.presenter import DefaultPresenter
 from dizzybot.defaults.queue import DefaultQueue
 from dizzybot.defaults.radio import DefaultRadioResolver
 from dizzybot.defaults.radio_commands import DefaultRadioCommands
+from dizzybot.defaults.radio_metadata import DefaultIcyMetadataProvider
 from dizzybot.defaults.radio_repository import DefaultRadioRepository
 from dizzybot.defaults.resolver import DefaultTrackResolver
 from dizzybot.defaults.runtime import DefaultBotRuntime, DefaultDiscordBot
@@ -51,6 +53,7 @@ class ServiceContainer:
     settings: BaseSettingsRepository
     radios: BaseRadioRepository
     radio_resolver: BaseRadioResolver
+    radio_metadata: BaseRadioMetadataProvider
     permissions: BasePermissionPolicy
     presenter: BasePresenter
     controls: BasePlaybackControls
@@ -95,6 +98,7 @@ def build_services(config: AppConfig) -> ServiceContainer:
         audio,
         allow_private_networks=config.bot.allow_private_radio_streams,
     )
+    radio_metadata = DefaultIcyMetadataProvider(radio_resolver)
     players = DefaultPlayerManager(
         audio,
         settings,
@@ -103,6 +107,7 @@ def build_services(config: AppConfig) -> ServiceContainer:
         player_factory=DefaultGuildPlayer,
         queue_factory=DefaultQueue,
         queue_limit=config.bot.queue_track_limit,
+        radio_metadata=radio_metadata,
     )
     presenter.set_public_response_handler(players.repost_controls)
     music_commands = DefaultMusicCommands(
@@ -147,6 +152,7 @@ def build_services(config: AppConfig) -> ServiceContainer:
         settings=settings,
         radios=radios,
         radio_resolver=radio_resolver,
+        radio_metadata=radio_metadata,
         permissions=permissions,
         presenter=presenter,
         controls=controls,
