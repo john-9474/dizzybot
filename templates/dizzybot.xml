@@ -15,7 +15,7 @@
   <Category>MediaApp:Music</Category>
   <ExtraSearchTerms>discord bot lavalink youtube soundcloud spotify apple music tidal bandcamp internet radio icecast shoutcast</ExtraSearchTerms>
   <Requires>A Discord bot token and outbound internet access. Allow approximately 1 GB of RAM for the bundled Lavalink process.</Requires>
-  <Changes>Adds live ICY radio metadata to the playback panel.</Changes>
+  <Changes>Adds live radio metadata from ICY streams and supported station feeds.</Changes>
   <License>GPL-3.0-only</License>
   <ExtraParams>--restart=unless-stopped</ExtraParams>
   <Config Name="Appdata" Target="/data" Default="/mnt/user/appdata/dizzybot" Mode="rw" Description="Persistent DizzyBot database and server settings." Type="Path" Display="always" Required="true" Mask="false"/>

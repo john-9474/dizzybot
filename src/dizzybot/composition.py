@@ -36,7 +36,11 @@ from dizzybot.defaults.presenter import DefaultPresenter
 from dizzybot.defaults.queue import DefaultQueue
 from dizzybot.defaults.radio import DefaultRadioResolver
 from dizzybot.defaults.radio_commands import DefaultRadioCommands
-from dizzybot.defaults.radio_metadata import DefaultIcyMetadataProvider
+from dizzybot.defaults.radio_metadata import (
+    DefaultBauerMetadataProvider,
+    DefaultIcyMetadataProvider,
+    DefaultRadioMetadataProvider,
+)
 from dizzybot.defaults.radio_repository import DefaultRadioRepository
 from dizzybot.defaults.resolver import DefaultTrackResolver
 from dizzybot.defaults.runtime import DefaultBotRuntime, DefaultDiscordBot
@@ -98,7 +102,12 @@ def build_services(config: AppConfig) -> ServiceContainer:
         audio,
         allow_private_networks=config.bot.allow_private_radio_streams,
     )
-    radio_metadata = DefaultIcyMetadataProvider(radio_resolver)
+    radio_metadata = DefaultRadioMetadataProvider(
+        (
+            DefaultBauerMetadataProvider(),
+            DefaultIcyMetadataProvider(radio_resolver),
+        )
+    )
     players = DefaultPlayerManager(
         audio,
         settings,
