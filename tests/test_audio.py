@@ -46,13 +46,19 @@ class FakeWavelinkPlayer:
         self.paused = False
         self.volume = 100
         self.played: Any | None = None
+        self.play_kwargs: dict[str, Any] = {}
+        self.voice_update_count = 0
 
     async def disconnect(self) -> None:
         self.connected = False
 
     async def play(self, track: Any, **kwargs: Any) -> None:
         self.played = track
+        self.play_kwargs = kwargs
         self.volume = kwargs["volume"]
+
+    async def _dispatch_voice_update(self) -> None:
+        self.voice_update_count += 1
 
     async def skip(self, **kwargs: Any) -> None:
         self.current = None
@@ -88,6 +94,7 @@ async def test_audio_start_close_and_listeners(monkeypatch: pytest.MonkeyPatch) 
     await audio.start(client)
     assert audio.is_ready() is True
     assert "on_wavelink_track_end" in listeners
+    assert "on_wavelink_node_disconnected" in listeners
     await audio.close()
     assert audio.is_ready() is False
 
@@ -174,6 +181,7 @@ async def test_audio_player_controls_and_events(monkeypatch: pytest.MonkeyPatch)
 
     channel = SimpleNamespace(id=5, connect=channel_connect)
     await audio.connect(1, channel)
+    audio._ready = True
     track = audio._track(playable())
     await audio.play(1, track, 70)
     await audio.pause(1, True)
@@ -228,6 +236,7 @@ async def test_audio_refreshes_soundcloud_track_before_playback(
         return player
 
     await audio.connect(1, SimpleNamespace(id=5, connect=channel_connect))
+    audio._ready = True
     original = playable("soundcloud-id", source="soundcloud")
     fresh_data = dict(original.raw_data)
     fresh_data["encoded"] = "fresh-encoded"
@@ -266,6 +275,7 @@ async def test_audio_refreshes_radio_stream_before_playback(
         return player
 
     await audio.connect(1, SimpleNamespace(id=5, connect=channel_connect))
+    audio._ready = True
     original = playable("radio-id", source="http", stream=True)
     fresh_data = dict(original.raw_data)
     fresh_data["encoded"] = "fresh-radio-encoded"
@@ -280,3 +290,36 @@ async def test_audio_refreshes_radio_stream_before_playback(
     await audio.play(1, track, 70)
 
     assert player.played is fresh
+
+
+async def test_audio_tracks_node_disconnect_and_restores_unresumed_players() -> None:
+    audio = backend()
+    player = FakeWavelinkPlayer(5)
+    current = playable("radio-id", source="http", stream=True)
+    player.current = current
+    audio._players[1] = player  # type: ignore[assignment]
+    audio._ready = True
+
+    await audio._on_node_disconnected(SimpleNamespace(node=SimpleNamespace(identifier="node")))
+    assert audio.is_ready() is False
+    with pytest.raises(AudioBackendError, match="reconnecting"):
+        await audio.stop(1)
+
+    await audio._on_node_ready(SimpleNamespace(resumed=False))
+
+    assert audio.is_ready() is True
+    assert player.voice_update_count == 1
+    assert player.played is current
+    assert player.play_kwargs["start"] == 0
+    assert player.play_kwargs["add_history"] is False
+
+
+async def test_audio_preserves_resumed_lavalink_players() -> None:
+    audio = backend()
+    player = FakeWavelinkPlayer(5)
+    audio._players[1] = player  # type: ignore[assignment]
+
+    await audio._on_node_ready(SimpleNamespace(resumed=True))
+
+    assert audio.is_ready() is True
+    assert player.voice_update_count == 0

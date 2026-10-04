@@ -54,6 +54,7 @@ class DefaultAudioBackend(BaseAudioBackend):
         client.add_listener(self._on_track_exception, "on_wavelink_track_exception")
         client.add_listener(self._on_track_stuck, "on_wavelink_track_stuck")
         client.add_listener(self._on_node_ready, "on_wavelink_node_ready")
+        client.add_listener(self._on_node_disconnected, "on_wavelink_node_disconnected")
         client.add_listener(self._on_node_closed, "on_wavelink_node_closed")
         self._ready = True
 
@@ -141,6 +142,8 @@ class DefaultAudioBackend(BaseAudioBackend):
             await player.disconnect()
 
     def _player(self, guild_id: int) -> wavelink.Player:
+        if not self._ready:
+            raise AudioBackendError("The audio service is reconnecting; try again shortly.")
         player = self._players.get(guild_id)
         if player is None or not player.connected:
             raise PlayerStateError()
@@ -267,7 +270,54 @@ class DefaultAudioBackend(BaseAudioBackend):
         await self._dispatch(payload, PlaybackEndReason.STUCK)
 
     async def _on_node_ready(self, payload: Any) -> None:
+        # A successfully resumed Lavalink session retains its server-side players.
+        # A new session does not, even though Wavelink's local Player objects remain
+        # connected to Discord. Re-send their voice state and restart any track so
+        # subsequent player updates do not target a missing Lavalink player.
+        if getattr(payload, "resumed", False):
+            self._ready = True
+            return
+
+        for guild_id, player in tuple(self._players.items()):
+            if not player.connected:
+                continue
+            current = player.current
+            backend_key = getattr(current, "encoded", None)
+            if backend_key is not None:
+                backend_key = self._backend_key_aliases.get(guild_id, {}).get(
+                    backend_key, backend_key
+                )
+            try:
+                # Wavelink has no public API for re-sending an existing player's
+                # cached Discord voice credentials to a replacement session.
+                await player._dispatch_voice_update()  # pyright: ignore[reportPrivateUsage]
+                if not player.connected:
+                    raise AudioBackendError("Lavalink rejected the restored voice session.")
+                if current is not None:
+                    await player.play(
+                        current,
+                        replace=True,
+                        start=0 if current.is_stream else player.position,
+                        volume=player.volume,
+                        paused=player.paused,
+                        add_history=False,
+                    )
+                LOGGER.info("Restored Lavalink player for guild %d after reconnect", guild_id)
+            except Exception:
+                LOGGER.exception(
+                    "Could not restore Lavalink player for guild %d after reconnect", guild_id
+                )
+                await self.disconnect(guild_id)
+                if current is not None and self._handler is not None:
+                    await self._handler(guild_id, PlaybackEndReason.DISCONNECTED, backend_key)
         self._ready = True
+
+    async def _on_node_disconnected(self, payload: Any) -> None:
+        self._ready = False
+        LOGGER.warning(
+            "Lost connection to Lavalink node %s; waiting to reconnect",
+            getattr(getattr(payload, "node", None), "identifier", self._config.identifier),
+        )
 
     async def _on_node_closed(self, node: Any, disconnected: Any) -> None:
         del node, disconnected
