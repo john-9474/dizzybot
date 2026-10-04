@@ -344,7 +344,7 @@ intentionally no dynamic plugin loader or import-path configuration.
 Python 3.13 and [uv](https://docs.astral.sh/uv/) are recommended:
 
 ```sh
-uv sync --frozen --extra dev
+uv sync --locked --extra dev
 uv run ruff format --check src tests
 uv run ruff check src tests
 uv run pyright

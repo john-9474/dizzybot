@@ -5,7 +5,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.7 /uv /usr/local/bin/uv
 WORKDIR /build
 COPY pyproject.toml uv.lock README.md LICENSE ./
 COPY src ./src
-RUN uv export --frozen --no-dev --no-emit-project --output-file requirements.txt \
+RUN uv export --locked --no-dev --no-emit-project --output-file requirements.txt \
     && python -m pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt \
     && python -m pip wheel --no-cache-dir --wheel-dir /wheels --no-deps .
 
