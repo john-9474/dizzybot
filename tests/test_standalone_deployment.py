@@ -99,6 +99,19 @@ def test_lavalink_uses_bundled_ytdlp_for_youtube() -> None:
     assert "LAVASRC_TIDAL_CONFIGURED" in config["plugins"]["lavasrc"]["sources"]["tidal"]
 
 
+def test_audio_images_replace_the_builtin_soundcloud_source_with_the_aac_plugin() -> None:
+    config = yaml.safe_load(
+        (ROOT / "deploy" / "lavalink" / "application.yml").read_text(encoding="utf-8")
+    )
+    assert config["lavalink"]["server"]["sources"]["soundcloud"] is False
+    assert config["lavalink"]["server"]["soundcloudSearchEnabled"] is True
+    assert config["lavalink"]["server"]["soundcloudFilterOutPreviewTracks"] is True
+    for image in ("lavalink", "standalone"):
+        dockerfile = (ROOT / "deploy" / image / "Dockerfile").read_text(encoding="utf-8")
+        assert "maven:3.9.11-eclipse-temurin-17 AS soundcloud-plugin" in dockerfile
+        assert "/build/target/dizzybot-soundcloud.jar /opt/Lavalink/plugins/" in dockerfile
+
+
 def test_standalone_generates_private_lavalink_password(monkeypatch: pytest.MonkeyPatch) -> None:
     entrypoint = _entrypoint_module()
     for name in (

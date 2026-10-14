@@ -47,7 +47,11 @@ class DefaultAudioBackend(BaseAudioBackend):
             inactive_channel_tokens=None,
         )
         try:
-            await wavelink.Pool.connect(nodes=[node], client=client, cache_capacity=100)
+            # Wavelink's request cache has no expiry and also intercepts the
+            # refresh before playback. SoundCloud media URLs must reach Lavalink
+            # again, even when this URI has already been loaded in this process.
+            wavelink.Pool.cache(None)
+            await wavelink.Pool.connect(nodes=[node], client=client)
         except Exception as error:
             raise AudioBackendError("Could not connect to Lavalink.") from error
         client.add_listener(self._on_track_end, "on_wavelink_track_end")
@@ -256,6 +260,16 @@ class DefaultAudioBackend(BaseAudioBackend):
         await self._dispatch(payload, reason)
 
     async def _on_track_exception(self, payload: wavelink.TrackExceptionEventPayload) -> None:
+        exception = getattr(payload, "exception", {})
+        LOGGER.error(
+            "Track playback failed in guild %s: title=%r source=%s severity=%s message=%s cause=%s",
+            self._guild_id(payload),
+            payload.track.title,
+            payload.track.source,
+            exception.get("severity"),
+            exception.get("message"),
+            exception.get("cause"),
+        )
         # Lavalink follows a TrackExceptionEvent with a TrackEndEvent. Remember
         # the exception and normalize that single end event as a load failure,
         # avoiding two independent queue advances for the same track.
@@ -267,6 +281,13 @@ class DefaultAudioBackend(BaseAudioBackend):
         self._track_exceptions.setdefault(guild_id, Counter())[backend_key] += 1
 
     async def _on_track_stuck(self, payload: wavelink.TrackStuckEventPayload) -> None:
+        LOGGER.warning(
+            "Track stuck in guild %s: title=%r source=%s threshold_ms=%s",
+            self._guild_id(payload),
+            payload.track.title,
+            payload.track.source,
+            getattr(payload, "threshold", None),
+        )
         await self._dispatch(payload, PlaybackEndReason.STUCK)
 
     async def _on_node_ready(self, payload: Any) -> None:

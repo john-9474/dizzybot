@@ -127,6 +127,12 @@ API token and mirrors matches to YouTube or SoundCloud. Set `APPLE_MUSIC_COUNTRY
 two-letter storefront code if the default `GB` is not appropriate. Bandcamp public tracks and albums
 are loaded directly by Lavalink.
 
+SoundCloud playback uses a small bundled Lavalink plugin that extends LavaPlayer's existing
+SoundCloud source with AAC in fragmented MP4 HLS streams. It retains SoundCloud search, sets,
+metadata, preview filtering, and legacy MP3/Opus support. Audio is streamed into LavaPlayer's existing
+decoder, with segment-aware seeking and periodic renewal of signed media URLs. Both packaged audio
+images include the plugin; no extra account, container, or operator setting is needed.
+
 For `/play` searches, `source` can be `auto`, `youtube`, `soundcloud`, `spotify`, `apple_music`,
 `tidal`, or `bandcamp`. You can also choose any configured source as a server's default with
 `/settings search-provider`. A URL automatically selects its matching source regardless of that
@@ -301,6 +307,39 @@ Health endpoints are:
 
 - `/health/live`: the process and HTTP server are running
 - `/health/ready`: storage is migrated and Discord and Lavalink are connected
+
+### Playback troubleshooting
+
+For a failed track, capture logs from both the bot and Lavalink. On Unraid, run the following in the
+host terminal, using the installed container's name if it differs from `DizzyBot`:
+
+```sh
+docker logs --since 10m --timestamps DizzyBot > /tmp/dizzybot-playback.log 2>&1
+```
+
+For the Compose deployment:
+
+```sh
+docker compose logs --since 10m --timestamps bot lavalink > dizzybot-playback.log 2>&1
+```
+
+Capture the logs immediately after reproducing the failure. Include the first error and its
+`Caused by` lines; an excerpt beginning with `at io.undertow...` is already partway through a stack
+trace. The bot logs playback exceptions with the track title, source, server ID, and Lavalink's
+message, severity, and cause. A stuck-track warning also includes the configured threshold.
+
+`RejectedExecutionException` mentioning `LavalinkPlayer.onTrackStart` and a `Terminated` scheduled
+executor indicates a shut-down Lavalink session. Restart the standalone container, or both Compose
+services with `docker compose restart`, to establish a fresh session. This error alone does not
+identify a SoundCloud media failure; retain the earlier logs to distinguish the two.
+
+SoundCloud tracks are reloaded before playback, and Wavelink's request cache is disabled so that
+reload reaches Lavalink. If a fresh track still fails, its underlying provider error is needed to
+diagnose the failure. Older images using Lavalink's original SoundCloud reader report
+`Did not detect any supported formats` for AAC-only tracks. Update the audio image as well as the bot
+(the standalone Unraid image contains both). Startup should report the `dizzybot-soundcloud` plugin.
+Custom Lavalink deployments need the bundled plugin and must disable the original SoundCloud source
+as shown in `deploy/lavalink/application.yml`.
 
 ## Customizing a fork
 

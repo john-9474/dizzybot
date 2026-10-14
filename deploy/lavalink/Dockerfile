@@ -16,11 +16,18 @@ RUN case "${TARGETARCH}" in \
 
 FROM denoland/deno:bin-2.9.5 AS deno
 
+FROM --platform=$BUILDPLATFORM maven:3.9.11-eclipse-temurin-17 AS soundcloud-plugin
+WORKDIR /build
+COPY soundcloud-plugin/pom.xml ./
+COPY soundcloud-plugin/src ./src
+RUN --mount=type=cache,target=/root/.m2 mvn -B -ntp verify
+
 FROM ghcr.io/lavalink-devs/lavalink:4.2.2
 
 USER root
 COPY --from=ytdlp /yt-dlp /usr/local/bin/yt-dlp
 COPY --from=deno /deno /usr/local/bin/deno
+COPY --from=soundcloud-plugin --chown=lavalink:lavalink /build/target/dizzybot-soundcloud.jar /opt/Lavalink/plugins/
 COPY --chown=lavalink:lavalink application.yml /opt/Lavalink/application.yml
 COPY --chown=lavalink:lavalink entrypoint.sh /usr/local/bin/dizzybot-lavalink-entrypoint.sh
 COPY --chown=lavalink:lavalink healthcheck.sh /usr/local/bin/dizzybot-lavalink-healthcheck.sh

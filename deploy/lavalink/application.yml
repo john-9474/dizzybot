@@ -11,7 +11,7 @@ lavalink:
     sources:
       youtube: false
       bandcamp: true
-      soundcloud: true
+      soundcloud: false # Replaced by the bundled plugin, which adds AAC/fMP4 HLS support.
       twitch: false
       vimeo: false
       nico: false

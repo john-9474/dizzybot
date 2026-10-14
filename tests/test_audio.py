@@ -264,6 +264,70 @@ async def test_audio_refreshes_soundcloud_track_before_playback(
     assert events[-1][2] == original.encoded
 
 
+async def test_audio_soundcloud_refresh_does_not_reuse_wavelink_request_cache(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audio = backend()
+    original = playable("soundcloud-id", source="soundcloud")
+    fresh_data = dict(original.raw_data, encoded="fresh-encoded")
+    requests: list[str] = []
+
+    async def fetch_tracks(query: str) -> dict[str, Any]:
+        requests.append(query)
+        return {
+            "loadType": "track",
+            "data": original.raw_data if len(requests) == 1 else fresh_data,
+        }
+
+    async def connect(**kwargs: Any) -> dict[str, Any]:
+        # Reproduce Pool.connect's cache configuration without a live node.
+        if kwargs.get("cache_capacity"):
+            wavelink.Pool.cache(kwargs["cache_capacity"])
+        return {}
+
+    monkeypatch.setattr(wavelink.Pool, "_Pool__cache", None)
+    wavelink.Pool.cache(100)
+    monkeypatch.setattr(wavelink.Pool, "connect", connect)
+    monkeypatch.setattr(
+        wavelink.Pool, "get_node", lambda: SimpleNamespace(_fetch_tracks=fetch_tracks)
+    )
+    await audio.start(SimpleNamespace(add_listener=lambda *args: None))
+    player = FakeWavelinkPlayer(5)
+    audio._players[1] = player  # type: ignore[assignment]
+
+    # Use the real Pool.fetch_tracks: mocking it would hide the cache bug.
+    loaded = await audio.load_tracks(original.uri or "")
+    await audio.play(1, loaded.tracks[0], 70)
+
+    assert len(requests) == 2
+    assert requests[0] == requests[1]
+    assert player.played.encoded == "fresh-encoded"
+
+
+async def test_audio_logs_lavalink_track_exception_details(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    audio = backend()
+    await audio._on_track_exception(
+        SimpleNamespace(
+            player=SimpleNamespace(guild=SimpleNamespace(id=42)),
+            track=playable(source="soundcloud"),
+            exception={
+                "message": "Something broke when playing the track.",
+                "severity": "fault",
+                "cause": "java.io.IOException: Invalid status code for soundcloud stream: 404",
+            },
+        )
+    )
+
+    assert "guild 42" in caplog.text
+    assert "title='Song' source=soundcloud severity=fault" in caplog.text
+    assert "message=Something broke when playing the track." in caplog.text
+    assert (
+        "cause=java.io.IOException: Invalid status code for soundcloud stream: 404" in caplog.text
+    )
+
+
 async def test_audio_refreshes_radio_stream_before_playback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
