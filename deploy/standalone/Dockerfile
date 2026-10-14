@@ -16,7 +16,7 @@ RUN case "${TARGETARCH}" in \
 
 FROM python:3.13-slim-bookworm AS build
 
-COPY --from=ghcr.io/astral-sh/uv:0.12.7 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.12.18 /uv /usr/local/bin/uv
 WORKDIR /build
 COPY pyproject.toml uv.lock README.md LICENSE ./
 COPY src ./src

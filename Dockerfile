@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 FROM python:3.14-slim AS build
 
-COPY --from=ghcr.io/astral-sh/uv:0.12.7 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.12.18 /uv /usr/local/bin/uv
 WORKDIR /build
 COPY pyproject.toml uv.lock README.md LICENSE ./
 COPY src ./src
