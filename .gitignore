@@ -12,6 +12,6 @@ htmlcov/
 data/
 dist/
 build/
-deploy/lavalink/soundcloud-plugin/target/
+deploy/lavalink/sources-plugin/target/
 .idea/
 .vscode/

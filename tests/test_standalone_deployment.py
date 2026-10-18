@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 from pathlib import Path
 from types import ModuleType
+from unittest.mock import Mock
 from xml.etree import ElementTree
 
 import pytest
@@ -35,7 +37,7 @@ def test_unraid_template_deploys_one_combined_container() -> None:
         "DIZZYBOT__BOT__IDLE_TIMEOUT_SECONDS": "300",
         "DIZZYBOT__BOT__STAY_CONNECTED": "false",
         "DIZZYBOT__BOT__DEFAULT_SEARCH_SOURCE": "youtube",
-        "DIZZYBOT__BOT__PLAYLIST_TRACK_LIMIT": "100",
+        "DIZZYBOT__BOT__PLAYLIST_TRACK_LIMIT": "500",
         "DIZZYBOT__BOT__QUEUE_TRACK_LIMIT": "500",
         "DIZZYBOT__BOT__RADIO_STATION_LIMIT": "50",
         "DIZZYBOT__BOT__ALLOW_PRIVATE_RADIO_STREAMS": "false",
@@ -99,17 +101,18 @@ def test_lavalink_uses_bundled_ytdlp_for_youtube() -> None:
     assert "LAVASRC_TIDAL_CONFIGURED" in config["plugins"]["lavasrc"]["sources"]["tidal"]
 
 
-def test_audio_images_replace_the_builtin_soundcloud_source_with_the_aac_plugin() -> None:
+def test_audio_images_register_the_bundled_sources_once() -> None:
     config = yaml.safe_load(
         (ROOT / "deploy" / "lavalink" / "application.yml").read_text(encoding="utf-8")
     )
     assert config["lavalink"]["server"]["sources"]["soundcloud"] is False
+    assert config["plugins"]["lavasrc"]["sources"]["spotify"] is False
     assert config["lavalink"]["server"]["soundcloudSearchEnabled"] is True
     assert config["lavalink"]["server"]["soundcloudFilterOutPreviewTracks"] is True
     for image in ("lavalink", "standalone"):
         dockerfile = (ROOT / "deploy" / image / "Dockerfile").read_text(encoding="utf-8")
-        assert "maven:3.9.11-eclipse-temurin-17 AS soundcloud-plugin" in dockerfile
-        assert "/build/target/dizzybot-soundcloud.jar /opt/Lavalink/plugins/" in dockerfile
+        assert "maven:3.9.11-eclipse-temurin-17 AS sources-plugin" in dockerfile
+        assert "/build/target/dizzybot-sources.jar /opt/Lavalink/plugins/" in dockerfile
 
 
 def test_standalone_generates_private_lavalink_password(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -154,3 +157,25 @@ def test_standalone_enables_tidal_from_token(monkeypatch: pytest.MonkeyPatch) ->
     entrypoint._configure_environment()
 
     assert entrypoint.os.environ["LAVASRC_TIDAL_CONFIGURED"] == "true"
+
+
+def test_standalone_merges_both_child_error_streams_into_container_log(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    entrypoint = _entrypoint_module()
+    monkeypatch.setenv("HOME", "temporary-test-home")
+    monkeypatch.setenv("DIZZYBOT_CONFIG", "/etc/dizzybot/config.yml")
+    monkeypatch.setattr(entrypoint, "_configure_environment", lambda: None)
+    monkeypatch.setattr(entrypoint, "_runtime_ids", lambda: (99, 100))
+    monkeypatch.setattr(entrypoint, "_prepare_writable_paths", lambda *_: None)
+    monkeypatch.setattr(entrypoint, "_terminate", lambda *_: None)
+    monkeypatch.setattr(entrypoint.signal, "signal", lambda *_: None)
+    process = Mock()
+    process.poll.return_value = 1
+    popen = Mock(return_value=process)
+    monkeypatch.setattr(entrypoint.subprocess, "Popen", popen)
+
+    assert entrypoint.main() == 1
+
+    assert popen.call_count == 2
+    assert all(call.kwargs["stderr"] is subprocess.STDOUT for call in popen.call_args_list)

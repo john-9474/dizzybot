@@ -20,7 +20,7 @@ class BotConfig(BaseModel):
     idle_timeout_seconds: int = Field(default=300, ge=30, le=86400)
     stay_connected: bool = False
     default_search_source: Source = Source.YOUTUBE
-    playlist_track_limit: int = Field(default=100, ge=1, le=500)
+    playlist_track_limit: int = Field(default=500, ge=1, le=500)
     queue_track_limit: int = Field(default=500, ge=1, le=500)
     radio_station_limit: int = Field(default=50, ge=1, le=100)
     allow_private_radio_streams: bool = False

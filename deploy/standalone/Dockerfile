@@ -26,10 +26,10 @@ RUN uv export --locked --no-dev --no-emit-project --output-file requirements.txt
 
 FROM ghcr.io/lavalink-devs/lavalink:4.2.2 AS lavalink
 
-FROM --platform=$BUILDPLATFORM maven:3.9.11-eclipse-temurin-17 AS soundcloud-plugin
+FROM --platform=$BUILDPLATFORM maven:3.9.11-eclipse-temurin-17 AS sources-plugin
 WORKDIR /build
-COPY deploy/lavalink/soundcloud-plugin/pom.xml ./
-COPY deploy/lavalink/soundcloud-plugin/src ./src
+COPY deploy/lavalink/sources-plugin/pom.xml ./
+COPY deploy/lavalink/sources-plugin/src ./src
 RUN --mount=type=cache,target=/root/.m2 mvn -B -ntp verify
 
 FROM denoland/deno:bin-2.9.5 AS deno
@@ -61,7 +61,7 @@ RUN apt-get update \
 COPY --from=build /wheels /wheels
 RUN python -m pip install --no-cache-dir /wheels/* && rm -rf /wheels
 COPY --from=lavalink --chown=dizzybot:dizzybot /opt/Lavalink/Lavalink.jar /opt/Lavalink/
-COPY --from=soundcloud-plugin --chown=dizzybot:dizzybot /build/target/dizzybot-soundcloud.jar /opt/Lavalink/plugins/
+COPY --from=sources-plugin --chown=dizzybot:dizzybot /build/target/dizzybot-sources.jar /opt/Lavalink/plugins/
 COPY --from=ytdlp /yt-dlp /usr/local/bin/yt-dlp
 COPY --from=deno /deno /usr/local/bin/deno
 COPY --chown=dizzybot:dizzybot deploy/lavalink/application.yml /opt/Lavalink/application.yml

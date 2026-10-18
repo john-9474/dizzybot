@@ -125,6 +125,7 @@ def main() -> int:
                     cwd="/opt/Lavalink",
                     user=uid,
                     group=gid,
+                    stderr=subprocess.STDOUT,
                 ),
             )
         )
@@ -136,6 +137,7 @@ def main() -> int:
                     cwd="/app",
                     user=uid,
                     group=gid,
+                    stderr=subprocess.STDOUT,
                 ),
             )
         )

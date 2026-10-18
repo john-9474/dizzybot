@@ -28,7 +28,7 @@ jobs:
       - run: uv run pytest
       - run: uv run pip-audit
 
-  soundcloud:
+  sources:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -37,8 +37,8 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
-          cache-dependency-path: deploy/lavalink/soundcloud-plugin/pom.xml
-      - run: mvn -B -ntp -f deploy/lavalink/soundcloud-plugin/pom.xml verify
+          cache-dependency-path: deploy/lavalink/sources-plugin/pom.xml
+      - run: mvn -B -ntp -f deploy/lavalink/sources-plugin/pom.xml verify
 
   containers:
     runs-on: ubuntu-latest

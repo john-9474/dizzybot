@@ -155,6 +155,16 @@ remain available and Spotify requests return a configuration error. Current Spot
 accounts require the application owner to have Premium and are subject to Spotify's user and quota
 limits.
 
+For public playlists rejected by Spotify's development-mode API, the bundled source reads the
+public web-player metadata and paginates beyond the embed widget's first 100 tracks. It needs no
+Spotify account login or browser cookies, and playback continues through LavaSrc's YouTube and
+SoundCloud mirrors. This fallback uses an undocumented Spotify endpoint and may need updating when
+Spotify changes its web player. Private playlists are unavailable.
+
+The default playlist import and queue limits are 500 tracks. Existing Unraid installations retain
+their saved **Playlist Import Limit**; increase it from 100 to 500 in the container settings to import
+longer playlists. Compose users can set `PLAYLIST_TRACK_LIMIT=500` in `.env`.
+
 ### TIDAL
 
 TIDAL support is optional because LavaSrc requires a compatible API token. Add it to `.env` or the
@@ -317,6 +327,9 @@ host terminal, using the installed container's name if it differs from `DizzyBot
 docker logs --since 10m --timestamps DizzyBot > /tmp/dizzybot-playback.log 2>&1
 ```
 
+The standalone image merges both processes' standard error into standard output, so the Unraid
+container log includes Python bot errors alongside Lavalink messages.
+
 For the Compose deployment:
 
 ```sh
@@ -337,7 +350,7 @@ SoundCloud tracks are reloaded before playback, and Wavelink's request cache is 
 reload reaches Lavalink. If a fresh track still fails, its underlying provider error is needed to
 diagnose the failure. Older images using Lavalink's original SoundCloud reader report
 `Did not detect any supported formats` for AAC-only tracks. Update the audio image as well as the bot
-(the standalone Unraid image contains both). Startup should report the `dizzybot-soundcloud` plugin.
+(the standalone Unraid image contains both). Startup should report the `dizzybot-sources` plugin.
 Custom Lavalink deployments need the bundled plugin and must disable the original SoundCloud source
 as shown in `deploy/lavalink/application.yml`.
 

@@ -50,7 +50,7 @@ plugins:
       - "ytsearch:%QUERY%"
       - "scsearch:%QUERY%"
     sources:
-      spotify: ${LAVASRC_SPOTIFY_CONFIGURED:false}
+      spotify: false # Bundled source retains LavaSrc and adds public playlist pagination.
       applemusic: true
       deezer: false
       yandexmusic: false

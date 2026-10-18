@@ -3,7 +3,7 @@ bot:
   idle_timeout_seconds: 300
   stay_connected: false
   default_search_source: youtube
-  playlist_track_limit: 100
+  playlist_track_limit: 500
   queue_track_limit: 500
   radio_station_limit: 50
   allow_private_radio_streams: false
