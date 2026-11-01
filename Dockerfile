@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM python:3.14-slim AS build
+FROM python:3.15-slim AS build
 
 COPY --from=ghcr.io/astral-sh/uv:0.12.18 /uv /usr/local/bin/uv
 WORKDIR /build
@@ -9,7 +9,7 @@ RUN uv export --locked --no-dev --no-emit-project --output-file requirements.txt
     && python -m pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt \
     && python -m pip wheel --no-cache-dir --wheel-dir /wheels --no-deps .
 
-FROM python:3.14-slim
+FROM python:3.15-slim
 
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="DizzyBot" \
